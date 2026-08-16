@@ -1,0 +1,21 @@
+export const sportsWords = [
+  // Team Sports
+  'SOCCER', 'BASKETBALL', 'BASEBALL', 'FOOTBALL', 'VOLLEYBALL',
+  'HOCKEY', 'CRICKET', 'RUGBY', 'HANDBALL', 'WATERPOLO',
+  // Individual Sports
+  'TENNIS', 'GOLF', 'BOXING', 'KARATE', 'SWIMMING',
+  'CYCLING', 'RUNNING', 'SKIING', 'SNOWBOARD', 'SURFING',
+  'DIVING', 'Gymnastics', 'FENCING', 'ARCHERY', 'SKEET',
+  // Fitness
+  'WORKOUT', 'JOGGING', 'PUSHUP', 'PULLUP', 'SQUAT',
+  'DEADLIFT', 'BENCHPRESS', 'SHOULDERPRESS', 'DUMBBELL', 'KETTLEBELL',
+  // Sports Terms
+  'CHAMPION', 'MEDAL', 'TROPHY', 'SCORE', 'GOAL',
+  'TOUCHDOWN', 'HOMERUN', 'BULLSEYE', 'CHECKMATE', 'KNOCKOUT',
+  // Sports Equipment
+  'BALL', 'BAT', 'RACKET', 'CLUB', 'STICK',
+  'GLOVE', 'HELMET', 'PADS', 'CLEATS', 'JERSEY',
+  // Venues
+  'STADIUM', 'ARENA', 'FIELD', 'COURT', 'RINK',
+  'POOL', 'TRACK', 'GYM', 'CLUBHOUSE', 'LOCKERROOM'
+];
