@@ -1,36 +1,87 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Puzzle Book Generator
+
+A web application that generates themed puzzle books with minimal configuration.
+
+## Features
+
+- ?? Generate themed word search puzzle books
+- ?? Regenerate individual puzzles
+- ?? Drag-and-drop puzzle reordering
+- ?? Auto-numbering and solutions
+- ?? KDP-ready PDF export
+
+## Tech Stack
+
+- **Frontend:** Next.js 14, TypeScript, Tailwind CSS
+- **Backend:** Next.js API Routes, Prisma ORM
+- **Database:** PostgreSQL (Neon)
+- **Queue:** Redis (Upstash)
+- **Authentication:** NextAuth.js
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+- Node.js 20+
+- npm or yarn
+- Docker (optional, for local PostgreSQL/Redis)
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+### Installation
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+1. Clone the repository:
+   \\\ash
+   git clone https://github.com/YOUR_USERNAME/puzzle-book-generator.git
+   cd puzzle-book-generator
+   \\\
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+2. Install dependencies:
+   \\\ash
+   npm install
+   \\\
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+3. Setup environment variables:
+   \\\ash
+   cp .env.example .env
+   # Edit .env with your credentials
+   \\\
 
-## Learn More
+4. Run migrations:
+   \\\ash
+   npx prisma db push
+   \\\
 
-To learn more about Next.js, take a look at the following resources:
+5. Start development server:
+   \\\ash
+   npm run dev
+   \\\
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Project Structure
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+\\\
+puzzle-book-generator/
+??? src/
+?   ??? app/          # Next.js App Router
+?   ??? components/   # React components
+?   ??? lib/          # Utilities (prisma, auth)
+?   ??? modules/      # Feature modules
+??? prisma/           # Database schema
+??? docs/             # Documentation
+??? storage/          # File storage
+\\\
 
-## Deploy on Vercel
+## Development Phases
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- ? Phase 1: Research & Planning
+- ? Phase 2: Core Infrastructure
+- ? Phase 3: Puzzle Engine
+- ? Phase 4: Book Creation
+- ? Phase 5: Book Editor
+- ? Phase 6: Export & Publishing
+- ? Phase 7: Polish & Launch
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## License
+
+MIT
+
+## Author
+
+Your Name
