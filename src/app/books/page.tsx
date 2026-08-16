@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import Link from 'next/link';
-import { PlusCircle, BookOpen } from 'lucide-react';
+import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import Link from "next/link";
+import { PlusCircle, BookOpen } from "lucide-react";
 
 export default function BooksPage() {
   return (
@@ -24,7 +24,9 @@ export default function BooksPage() {
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
           <BookOpen size={48} className="mx-auto text-gray-300 mb-4" />
-          <h3 className="text-lg font-semibold text-gray-800 mb-2">No books yet</h3>
+          <h3 className="text-lg font-semibold text-gray-800 mb-2">
+            No books yet
+          </h3>
           <p className="text-gray-500 text-sm mb-4">
             Create your first puzzle book to get started.
           </p>
