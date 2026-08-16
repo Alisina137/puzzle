@@ -8,6 +8,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Loader2 } from "lucide-react";
+import { PublicLayout } from "@/components/layout/PublicLayout";
 
 const loginSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -47,7 +48,6 @@ export default function LoginPage() {
       }
 
       router.push("/dashboard");
-      router.refresh();
     } catch (error) {
       setError("Something went wrong. Please try again.");
       setIsLoading(false);
@@ -55,8 +55,8 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-50 to-gray-100 p-4">
-      <div className="w-full max-w-md">
+    <PublicLayout>
+      <div className="w-full max-w-md mx-auto">
         <div className="bg-white rounded-2xl shadow-xl p-8">
           <div className="text-center mb-8">
             <h1 className="text-2xl font-bold text-gray-800">Welcome Back</h1>
@@ -143,6 +143,6 @@ export default function LoginPage() {
           </p>
         </div>
       </div>
-    </div>
+    </PublicLayout>
   );
 }

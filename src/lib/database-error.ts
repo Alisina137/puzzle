@@ -27,11 +27,11 @@ export function handlePrismaError(error: any): DatabaseError {
           error.meta
         );
       default:
-        return new DatabaseError(
-          'DATABASE_ERROR',
-          Database error: ,
-          error.meta
-        );
+       return new DatabaseError(
+         "DATABASE_ERROR",
+         `Database error: ${error.message}`,
+         error.meta,
+       );
     }
   }
 

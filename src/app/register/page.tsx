@@ -1,23 +1,26 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { signIn } from 'next-auth/react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { Loader2 } from 'lucide-react';
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { signIn } from "next-auth/react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { Loader2 } from "lucide-react";
+import { PublicLayout } from "@/components/layout/PublicLayout";
 
-const registerSchema = z.object({
-  name: z.string().min(2, 'Name must be at least 2 characters').optional(),
-  email: z.string().email('Please enter a valid email address'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
-  confirmPassword: z.string().min(6, 'Please confirm your password'),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: 'Passwords do not match',
-  path: ['confirmPassword'],
-});
+const registerSchema = z
+  .object({
+    name: z.string().min(2, "Name must be at least 2 characters").optional(),
+    email: z.string().email("Please enter a valid email address"),
+    password: z.string().min(6, "Password must be at least 6 characters"),
+    confirmPassword: z.string().min(6, "Please confirm your password"),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords do not match",
+    path: ["confirmPassword"],
+  });
 
 type RegisterFormData = z.infer<typeof registerSchema>;
 
@@ -39,9 +42,9 @@ export default function RegisterPage() {
     setError(null);
 
     try {
-      const response = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: data.name,
           email: data.email,
@@ -52,32 +55,33 @@ export default function RegisterPage() {
       const result = await response.json();
 
       if (!response.ok) {
-        setError(result.message || 'Registration failed');
+        setError(result.message || "Registration failed");
         setIsLoading(false);
         return;
       }
 
-      await signIn('credentials', {
+      await signIn("credentials", {
         email: data.email,
         password: data.password,
         redirect: false,
       });
 
-      router.push('/dashboard');
-      router.refresh();
+      router.push("/dashboard");
     } catch (error) {
-      setError('Something went wrong. Please try again.');
+      setError("Something went wrong. Please try again.");
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-50 to-gray-100 p-4">
-      <div className="w-full max-w-md">
+    <PublicLayout>
+      <div className="w-full max-w-md mx-auto">
         <div className="bg-white rounded-2xl shadow-xl p-8">
           <div className="text-center mb-8">
             <h1 className="text-2xl font-bold text-gray-800">Create Account</h1>
-            <p className="text-gray-500 mt-2">Start creating your puzzle books</p>
+            <p className="text-gray-500 mt-2">
+              Start creating your puzzle books
+            </p>
           </div>
 
           {error && (
@@ -93,13 +97,15 @@ export default function RegisterPage() {
               </label>
               <input
                 type="text"
-                {...register('name')}
+                {...register("name")}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="John Doe"
                 disabled={isLoading}
               />
               {errors.name && (
-                <p className="text-red-500 text-sm mt-1">{errors.name.message}</p>
+                <p className="text-red-500 text-sm mt-1">
+                  {errors.name.message}
+                </p>
               )}
             </div>
 
@@ -109,13 +115,15 @@ export default function RegisterPage() {
               </label>
               <input
                 type="email"
-                {...register('email')}
+                {...register("email")}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="you@example.com"
                 disabled={isLoading}
               />
               {errors.email && (
-                <p className="text-red-500 text-sm mt-1">{errors.email.message}</p>
+                <p className="text-red-500 text-sm mt-1">
+                  {errors.email.message}
+                </p>
               )}
             </div>
 
@@ -125,13 +133,15 @@ export default function RegisterPage() {
               </label>
               <input
                 type="password"
-                {...register('password')}
+                {...register("password")}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="????????"
                 disabled={isLoading}
               />
               {errors.password && (
-                <p className="text-red-500 text-sm mt-1">{errors.password.message}</p>
+                <p className="text-red-500 text-sm mt-1">
+                  {errors.password.message}
+                </p>
               )}
             </div>
 
@@ -141,13 +151,15 @@ export default function RegisterPage() {
               </label>
               <input
                 type="password"
-                {...register('confirmPassword')}
+                {...register("confirmPassword")}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="????????"
                 disabled={isLoading}
               />
               {errors.confirmPassword && (
-                <p className="text-red-500 text-sm mt-1">{errors.confirmPassword.message}</p>
+                <p className="text-red-500 text-sm mt-1">
+                  {errors.confirmPassword.message}
+                </p>
               )}
             </div>
 
@@ -162,19 +174,22 @@ export default function RegisterPage() {
                   Creating account...
                 </>
               ) : (
-                'Create Account'
+                "Create Account"
               )}
             </button>
           </form>
 
           <p className="text-center text-sm text-gray-500 mt-6">
-            Already have an account?{' '}
-            <Link href="/login" className="text-blue-600 hover:text-blue-700 font-medium">
+            Already have an account?{" "}
+            <Link
+              href="/login"
+              className="text-blue-600 hover:text-blue-700 font-medium"
+            >
               Sign in
             </Link>
           </p>
         </div>
       </div>
-    </div>
+    </PublicLayout>
   );
 }
