@@ -7,7 +7,7 @@ export interface GridOptions {
   size?: number;
   rows?: number;
   cols?: number;
-  difficulty?: 'easy' | 'medium' | 'hard';
+  difficulty?: "easy" | "medium" | "hard";
 }
 
 export interface GridResult {
@@ -32,7 +32,7 @@ export class GridGenerator {
    * Generate a grid with the specified options
    */
   static generate(options: GridOptions = {}): GridResult {
-    const { difficulty = 'medium', size, rows, cols } = options;
+    const { difficulty = "medium", size, rows, cols } = options;
 
     // Determine dimensions
     let finalRows: number;
@@ -52,10 +52,9 @@ export class GridGenerator {
     }
 
     // Create empty grid
+    // Create empty grid.
+    // Words will be placed into this grid later by WordPlacer.
     const grid = this.createEmptyGrid(finalRows, finalCols);
-
-    // Fill with random letters
-    this.fillGrid(grid);
 
     return {
       grid,
@@ -68,14 +67,16 @@ export class GridGenerator {
    * Create an empty grid with the specified dimensions
    */
   static createEmptyGrid(rows: number, cols: number): string[][] {
-    return Array(rows).fill(null).map(() => Array(cols).fill(''));
+    return Array(rows)
+      .fill(null)
+      .map(() => Array(cols).fill(""));
   }
 
   /**
    * Fill the grid with random uppercase letters
    */
   static fillGrid(grid: string[][]): void {
-    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
     for (let i = 0; i < grid.length; i++) {
       for (let j = 0; j < grid[i].length; j++) {
         grid[i][j] = letters.charAt(Math.floor(Math.random() * letters.length));
@@ -86,7 +87,9 @@ export class GridGenerator {
   /**
    * Get recommended size for a given difficulty
    */
-  static getSizeForDifficulty(difficulty: 'easy' | 'medium' | 'hard'): GridDimensions {
+  static getSizeForDifficulty(
+    difficulty: "easy" | "medium" | "hard",
+  ): GridDimensions {
     return this.DIFFICULTY_SIZES[difficulty];
   }
 
@@ -94,8 +97,12 @@ export class GridGenerator {
    * Validate grid dimensions
    */
   static isValidSize(rows: number, cols: number): boolean {
-    return rows >= this.MIN_SIZE && rows <= this.MAX_SIZE &&
-           cols >= this.MIN_SIZE && cols <= this.MAX_SIZE;
+    return (
+      rows >= this.MIN_SIZE &&
+      rows <= this.MAX_SIZE &&
+      cols >= this.MIN_SIZE &&
+      cols <= this.MAX_SIZE
+    );
   }
 
   /**
@@ -113,6 +120,6 @@ export class GridGenerator {
    * Create a copy of a grid
    */
   static copyGrid(grid: string[][]): string[][] {
-    return grid.map(row => [...row]);
+    return grid.map((row) => [...row]);
   }
 }

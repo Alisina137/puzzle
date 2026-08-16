@@ -29,14 +29,30 @@ export class GridUtils {
   }
 
   /**
+   * Create a deep copy of a grid
+   */
+  static copyGrid(grid: string[][]): string[][] {
+    return grid.map((row) => [...row]);
+  }
+
+  /**
    * Get all neighboring positions
    */
-  static getNeighbors(grid: string[][], row: number, col: number): GridPosition[] {
+  static getNeighbors(
+    grid: string[][],
+    row: number,
+    col: number,
+  ): GridPosition[] {
     const neighbors: GridPosition[] = [];
     const directions = [
-      [-1, -1], [-1, 0], [-1, 1],
-      [0, -1],           [0, 1],
-      [1, -1],  [1, 0],  [1, 1],
+      [-1, -1],
+      [-1, 0],
+      [-1, 1],
+      [0, -1],
+      [0, 1],
+      [1, -1],
+      [1, 0],
+      [1, 1],
     ];
 
     for (const [dr, dc] of directions) {
@@ -53,7 +69,13 @@ export class GridUtils {
   /**
    * Get a subgrid
    */
-  static getSubgrid(grid: string[][], startRow: number, startCol: number, rows: number, cols: number): string[][] {
+  static getSubgrid(
+    grid: string[][],
+    startRow: number,
+    startCol: number,
+    rows: number,
+    cols: number,
+  ): string[][] {
     const subgrid: string[][] = [];
     for (let i = startRow; i < startRow + rows && i < grid.length; i++) {
       const row: string[] = [];
@@ -92,7 +114,7 @@ export class GridUtils {
 
     for (let i = 0; i < grid.length; i++) {
       for (let j = 0; j < grid[i].length; j++) {
-        if (grid[i][j] !== '' && grid[i][j] !== null) {
+        if (grid[i][j] !== "" && grid[i][j] !== null) {
           hasContent = true;
           minRow = Math.min(minRow, i);
           maxRow = Math.max(maxRow, i);
@@ -113,7 +135,7 @@ export class GridUtils {
    * Convert grid to string for display
    */
   static gridToString(grid: string[][]): string {
-    return grid.map(row => row.join(' ')).join('\n');
+    return grid.map((row) => row.join(" ")).join("\n");
   }
 
   /**
