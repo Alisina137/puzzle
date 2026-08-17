@@ -2,10 +2,9 @@ import { NextResponse } from "next/server";
 import { apiResponse } from "./api-response";
 import { Prisma } from "@prisma/client";
 
-export type ApiHandler<T = NextResponse> = (
-  req: Request,
-  context: { params: Record<string, string> },
-) => Promise<T>;
+export type ApiHandler<
+  P extends Record<string, string> = Record<string, string>,
+> = (req: Request, context: { params: P }) => Promise<NextResponse>;
 
 export function handleApiError(error: unknown): NextResponse {
   console.error("API Error:", error);
@@ -40,13 +39,12 @@ export function handleApiError(error: unknown): NextResponse {
   return apiResponse.internalError("An unexpected error occurred");
 }
 
-export function withApiHandler(
-  handler: ApiHandler,
-): (
-  req: Request,
-  context: { params: Record<string, string> },
-) => Promise<NextResponse> {
-  return async (req: Request, context: { params: Record<string, string> }) => {
+export function withApiHandler<
+  P extends Record<string, string> = Record<string, string>,
+>(
+  handler: ApiHandler<P>,
+): (req: Request, context: { params: P }) => Promise<NextResponse> {
+  return async (req: Request, context: { params: P }) => {
     try {
       return await handler(req, context);
     } catch (error) {
@@ -55,16 +53,12 @@ export function withApiHandler(
   };
 }
 
-// Helper for authenticated routes.
-// Authentication is handled by getServerSession(authOptions)
-// inside the actual route handlers.
-export function withAuth(
-  handler: ApiHandler,
-): (
-  req: Request,
-  context: { params: Record<string, string> },
-) => Promise<NextResponse> {
-  return async (req: Request, context: { params: Record<string, string> }) => {
+export function withAuth<
+  P extends Record<string, string> = Record<string, string>,
+>(
+  handler: ApiHandler<P>,
+): (req: Request, context: { params: P }) => Promise<NextResponse> {
+  return async (req: Request, context: { params: P }) => {
     try {
       return await handler(req, context);
     } catch (error) {

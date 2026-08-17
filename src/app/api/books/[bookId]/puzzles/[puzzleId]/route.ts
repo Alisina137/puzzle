@@ -1,14 +1,14 @@
-﻿import { NextRequest } from 'next/server';
-import { prisma } from '@/lib/prisma';
+﻿import { NextRequest } from "next/server";
+import { prisma } from "@/lib/prisma";
 import {
   apiResponse,
   withApiHandler,
   validateSchema,
   bookIdSchema,
   puzzleIdSchema,
-} from '@/lib';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+} from "@/lib";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 
 // Helper to verify book ownership
 async function verifyBookOwnership(bookId: string, userId: string) {
@@ -18,13 +18,13 @@ async function verifyBookOwnership(bookId: string, userId: string) {
   });
 
   if (!book) {
-    return { error: apiResponse.notFound('Book not found') };
+    return { error: apiResponse.notFound("Book not found") };
   }
 
   if (book.userId !== userId) {
     return {
       error: apiResponse.forbidden(
-        'You do not have permission to access this book'
+        "You do not have permission to access this book",
       ),
     };
   }
@@ -34,13 +34,13 @@ async function verifyBookOwnership(bookId: string, userId: string) {
 
 // GET /api/books/[bookId]/puzzles/[puzzleId]
 async function getPuzzle(
-  req: NextRequest,
-  context: { params: { bookId: string; puzzleId: string } }
+  req: Request,
+  context: { params: { bookId: string; puzzleId: string } },
 ) {
   const session = await getServerSession(authOptions);
 
   if (!session?.user?.id) {
-    return apiResponse.unauthorized('Please sign in');
+    return apiResponse.unauthorized("Please sign in");
   }
 
   const { bookId, puzzleId } = context.params;
@@ -49,27 +49,18 @@ async function getPuzzle(
   const bookValidation = validateSchema(bookIdSchema, { bookId });
 
   if (!bookValidation.success) {
-    return apiResponse.badRequest(
-      'Invalid book ID',
-      bookValidation.errors
-    );
+    return apiResponse.badRequest("Invalid book ID", bookValidation.errors);
   }
 
   // Validate puzzle ID
   const puzzleValidation = validateSchema(puzzleIdSchema, { puzzleId });
 
   if (!puzzleValidation.success) {
-    return apiResponse.badRequest(
-      'Invalid puzzle ID',
-      puzzleValidation.errors
-    );
+    return apiResponse.badRequest("Invalid puzzle ID", puzzleValidation.errors);
   }
 
   // Verify ownership
-  const ownership = await verifyBookOwnership(
-    bookId,
-    session.user.id
-  );
+  const ownership = await verifyBookOwnership(bookId, session.user.id);
 
   if (ownership.error) {
     return ownership.error;
@@ -93,9 +84,7 @@ async function getPuzzle(
   });
 
   if (!bookPuzzle) {
-    return apiResponse.notFound(
-      'Puzzle not found in this book'
-    );
+    return apiResponse.notFound("Puzzle not found in this book");
   }
 
   return apiResponse.success(bookPuzzle);
@@ -103,13 +92,13 @@ async function getPuzzle(
 
 // DELETE /api/books/[bookId]/puzzles/[puzzleId]
 async function deletePuzzle(
-  req: NextRequest,
-  context: { params: { bookId: string; puzzleId: string } }
+  req: Request,
+  context: { params: { bookId: string; puzzleId: string } },
 ) {
   const session = await getServerSession(authOptions);
 
   if (!session?.user?.id) {
-    return apiResponse.unauthorized('Please sign in');
+    return apiResponse.unauthorized("Please sign in");
   }
 
   const { bookId, puzzleId } = context.params;
@@ -118,27 +107,18 @@ async function deletePuzzle(
   const bookValidation = validateSchema(bookIdSchema, { bookId });
 
   if (!bookValidation.success) {
-    return apiResponse.badRequest(
-      'Invalid book ID',
-      bookValidation.errors
-    );
+    return apiResponse.badRequest("Invalid book ID", bookValidation.errors);
   }
 
   // Validate puzzle ID
   const puzzleValidation = validateSchema(puzzleIdSchema, { puzzleId });
 
   if (!puzzleValidation.success) {
-    return apiResponse.badRequest(
-      'Invalid puzzle ID',
-      puzzleValidation.errors
-    );
+    return apiResponse.badRequest("Invalid puzzle ID", puzzleValidation.errors);
   }
 
   // Verify ownership
-  const ownership = await verifyBookOwnership(
-    bookId,
-    session.user.id
-  );
+  const ownership = await verifyBookOwnership(bookId, session.user.id);
 
   if (ownership.error) {
     return ownership.error;
@@ -153,9 +133,7 @@ async function deletePuzzle(
   });
 
   if (!bookPuzzle) {
-    return apiResponse.notFound(
-      'Puzzle not found in this book'
-    );
+    return apiResponse.notFound("Puzzle not found in this book");
   }
 
   // Remember the position before deletion
@@ -186,10 +164,7 @@ async function deletePuzzle(
     },
   });
 
-  return apiResponse.success(
-    null,
-    'Puzzle removed from book'
-  );
+  return apiResponse.success(null, "Puzzle removed from book");
 }
 
 export const GET = withApiHandler(getPuzzle);

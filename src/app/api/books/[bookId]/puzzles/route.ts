@@ -1,13 +1,15 @@
-﻿import { NextRequest } from 'next/server';
-import { prisma } from '@/lib/prisma';
+﻿import { NextRequest } from "next/server";
+
+import { Prisma } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
 import {
   apiResponse,
   withApiHandler,
   validateSchema,
   bookIdSchema,
-} from '@/lib';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+} from "@/lib";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 
 // Helper to verify book ownership
 async function verifyBookOwnership(bookId: string, userId: string) {
@@ -17,13 +19,13 @@ async function verifyBookOwnership(bookId: string, userId: string) {
   });
 
   if (!book) {
-    return { error: apiResponse.notFound('Book not found') };
+    return { error: apiResponse.notFound("Book not found") };
   }
 
   if (book.userId !== userId) {
     return {
       error: apiResponse.forbidden(
-        'You do not have permission to access this book'
+        "You do not have permission to access this book",
       ),
     };
   }
@@ -33,13 +35,13 @@ async function verifyBookOwnership(bookId: string, userId: string) {
 
 // GET /api/books/[bookId]/puzzles
 async function getPuzzles(
-  req: NextRequest,
-  context: { params: { bookId: string } }
+  req: Request,
+  context: { params: { bookId: string } },
 ) {
   const session = await getServerSession(authOptions);
 
   if (!session?.user?.id) {
-    return apiResponse.unauthorized('Please sign in');
+    return apiResponse.unauthorized("Please sign in");
   }
 
   const { bookId } = context.params;
@@ -47,16 +49,10 @@ async function getPuzzles(
   const idValidation = validateSchema(bookIdSchema, { bookId });
 
   if (!idValidation.success) {
-    return apiResponse.badRequest(
-      'Invalid book ID',
-      idValidation.errors
-    );
+    return apiResponse.badRequest("Invalid book ID", idValidation.errors);
   }
 
-  const ownership = await verifyBookOwnership(
-    bookId,
-    session.user.id
-  );
+  const ownership = await verifyBookOwnership(bookId, session.user.id);
 
   if (ownership.error) {
     return ownership.error;
@@ -70,7 +66,7 @@ async function getPuzzles(
       solution: true,
     },
     orderBy: {
-      position: 'asc',
+      position: "asc",
     },
   });
 
@@ -82,13 +78,13 @@ async function getPuzzles(
 
 // POST /api/books/[bookId]/puzzles
 async function createPuzzle(
-  req: NextRequest,
-  context: { params: { bookId: string } }
+  req: Request,
+  context: { params: { bookId: string } },
 ) {
   const session = await getServerSession(authOptions);
 
   if (!session?.user?.id) {
-    return apiResponse.unauthorized('Please sign in');
+    return apiResponse.unauthorized("Please sign in");
   }
 
   const { bookId } = context.params;
@@ -96,16 +92,10 @@ async function createPuzzle(
   const idValidation = validateSchema(bookIdSchema, { bookId });
 
   if (!idValidation.success) {
-    return apiResponse.badRequest(
-      'Invalid book ID',
-      idValidation.errors
-    );
+    return apiResponse.badRequest("Invalid book ID", idValidation.errors);
   }
 
-  const ownership = await verifyBookOwnership(
-    bookId,
-    session.user.id
-  );
+  const ownership = await verifyBookOwnership(bookId, session.user.id);
 
   if (ownership.error) {
     return ownership.error;
@@ -116,21 +106,21 @@ async function createPuzzle(
   });
 
   if (!book) {
-    return apiResponse.notFound('Book not found');
+    return apiResponse.notFound("Book not found");
   }
 
   // TODO: Replace this placeholder with the real puzzle generator.
   const puzzle = await prisma.puzzle.create({
     data: {
-      type: 'wordsearch',
+      type: "wordsearch",
       data: {
         grid: Array(10)
           .fill(null)
-          .map(() => Array(10).fill('A')),
-        words: ['TEST', 'BOOK', 'PUZZLE'],
+          .map(() => Array(10).fill("A")),
+        words: ["TEST", "BOOK", "PUZZLE"],
         size: 10,
       },
-      difficulty: 'medium',
+      difficulty: "medium",
       qualityScore: 95,
     },
   });
@@ -139,7 +129,7 @@ async function createPuzzle(
     data: {
       puzzleId: puzzle.id,
       versionNumber: 1,
-      data: puzzle.data,
+      data: puzzle.data === null ? Prisma.JsonNull : puzzle.data,
       isActive: true,
     },
   });
@@ -164,7 +154,7 @@ async function createPuzzle(
       puzzle,
       puzzleVersion,
     },
-    'Puzzle generated successfully'
+    "Puzzle generated successfully",
   );
 }
 

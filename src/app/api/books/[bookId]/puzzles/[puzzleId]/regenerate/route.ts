@@ -1,14 +1,14 @@
-﻿import { NextRequest } from 'next/server';
-import { prisma } from '@/lib/prisma';
+﻿import { NextRequest } from "next/server";
+import { prisma } from "@/lib/prisma";
 import {
   apiResponse,
   withApiHandler,
   validateSchema,
   bookIdSchema,
   puzzleIdSchema,
-} from '@/lib';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+} from "@/lib";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 
 // Helper to verify book ownership
 async function verifyBookOwnership(bookId: string, userId: string) {
@@ -18,13 +18,13 @@ async function verifyBookOwnership(bookId: string, userId: string) {
   });
 
   if (!book) {
-    return { error: apiResponse.notFound('Book not found') };
+    return { error: apiResponse.notFound("Book not found") };
   }
 
   if (book.userId !== userId) {
     return {
       error: apiResponse.forbidden(
-        'You do not have permission to access this book'
+        "You do not have permission to access this book",
       ),
     };
   }
@@ -35,13 +35,13 @@ async function verifyBookOwnership(bookId: string, userId: string) {
 // POST /api/books/[bookId]/puzzles/[puzzleId]/regenerate
 // Regenerate a puzzle
 async function regeneratePuzzle(
-  req: NextRequest,
-  context: { params: { bookId: string; puzzleId: string } }
+  req: Request,
+  context: { params: { bookId: string; puzzleId: string } },
 ) {
   const session = await getServerSession(authOptions);
 
   if (!session?.user?.id) {
-    return apiResponse.unauthorized('Please sign in');
+    return apiResponse.unauthorized("Please sign in");
   }
 
   const { bookId, puzzleId } = context.params;
@@ -50,10 +50,7 @@ async function regeneratePuzzle(
   const bookValidation = validateSchema(bookIdSchema, { bookId });
 
   if (!bookValidation.success) {
-    return apiResponse.badRequest(
-      'Invalid book ID',
-      bookValidation.errors
-    );
+    return apiResponse.badRequest("Invalid book ID", bookValidation.errors);
   }
 
   // Validate puzzle ID
@@ -62,17 +59,11 @@ async function regeneratePuzzle(
   });
 
   if (!puzzleValidation.success) {
-    return apiResponse.badRequest(
-      'Invalid puzzle ID',
-      puzzleValidation.errors
-    );
+    return apiResponse.badRequest("Invalid puzzle ID", puzzleValidation.errors);
   }
 
   // Verify book ownership
-  const ownership = await verifyBookOwnership(
-    bookId,
-    session.user.id
-  );
+  const ownership = await verifyBookOwnership(bookId, session.user.id);
 
   if (ownership.error) {
     return ownership.error;
@@ -91,14 +82,11 @@ async function regeneratePuzzle(
   });
 
   if (!bookPuzzle) {
-    return apiResponse.notFound(
-      'Puzzle not found in this book'
-    );
+    return apiResponse.notFound("Puzzle not found in this book");
   }
 
   // Get the current version number
-  const currentVersionNumber =
-    bookPuzzle.puzzleVersion?.versionNumber || 0;
+  const currentVersionNumber = bookPuzzle.puzzleVersion?.versionNumber || 0;
 
   const newVersionNumber = currentVersionNumber + 1;
 
@@ -107,8 +95,8 @@ async function regeneratePuzzle(
   const newPuzzleData = {
     grid: Array(10)
       .fill(null)
-      .map(() => Array(10).fill('B')),
-    words: ['REGENERATED', 'PUZZLE', 'BOOK'],
+      .map(() => Array(10).fill("B")),
+    words: ["REGENERATED", "PUZZLE", "BOOK"],
     size: 10,
     regeneratedAt: new Date().toISOString(),
   };
@@ -163,14 +151,12 @@ async function regeneratePuzzle(
     },
   });
 
-  return apiResponse.success(
-    {
-      bookPuzzle: updatedBookPuzzle,
-      puzzle: updatedPuzzle,
-      message: 'Puzzle regenerated successfully',
-      version: newVersionNumber,
-    }
-  );
+  return apiResponse.success({
+    bookPuzzle: updatedBookPuzzle,
+    puzzle: updatedPuzzle,
+    message: "Puzzle regenerated successfully",
+    version: newVersionNumber,
+  });
 }
 
 export const POST = withApiHandler(regeneratePuzzle);
