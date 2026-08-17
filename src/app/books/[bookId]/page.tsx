@@ -1,10 +1,15 @@
-'use client';
+﻿'use client';
 
 import { useParams } from 'next/navigation';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { useEffect, useState } from 'react';
 import { Loader2, ArrowLeft, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
+import { GenerationProgress } from '@/components/generation/GenerationProgress';
+
+interface BookPuzzle {
+  id: string;
+}
 
 interface Book {
   id: string;
@@ -14,7 +19,7 @@ interface Book {
   status: string;
   qualityScore: number | null;
   createdAt: string;
-  bookPuzzles: any[];
+  bookPuzzles: BookPuzzle[];
 }
 
 export default function BookPage() {
@@ -24,10 +29,14 @@ export default function BookPage() {
   const [book, setBook] = useState<Book | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     async function fetchBook() {
       try {
+        setLoading(true);
+        setError(null);
+
         const response = await fetch('/api/books/' + bookId);
 
         if (!response.ok) {
@@ -36,15 +45,41 @@ export default function BookPage() {
 
         const result = await response.json();
         setBook(result.data);
-      } catch (error) {
+      } catch (error: unknown) {
+        console.error('Failed to load book:', error);
+
         setError('Failed to load book');
       } finally {
         setLoading(false);
       }
     }
 
-    fetchBook();
-  }, [bookId]);
+    if (bookId) {
+      fetchBook();
+    }
+  }, [bookId, refreshKey]);
+
+  const handleGenerationComplete = () => {
+    setRefreshKey((prev) => prev + 1);
+  };
+
+  const handleGenerationError = (error: string) => {
+    console.error('Generation error:', error);
+    setRefreshKey((prev) => prev + 1);
+  };
+
+  const getStatusBadge = (status: string) => {
+    const styles: Record<string, string> = {
+      pending: 'bg-gray-100 text-gray-600',
+      generating: 'bg-yellow-100 text-yellow-700',
+      ready: 'bg-green-100 text-green-700',
+      exporting: 'bg-purple-100 text-purple-700',
+      exported: 'bg-blue-100 text-blue-700',
+      failed: 'bg-red-100 text-red-700',
+    };
+
+    return styles[status] || 'bg-gray-100 text-gray-600';
+  };
 
   if (loading) {
     return (
@@ -71,30 +106,17 @@ export default function BookPage() {
             href="/books"
             className="text-blue-600 hover:underline mt-2 inline-block"
           >
-            Back to Books
+            ← Back to Books
           </Link>
         </div>
       </DashboardLayout>
     );
   }
 
-  const getStatusBadge = (status: string) => {
-    const styles: Record<string, string> = {
-      pending: 'bg-gray-100 text-gray-600',
-      generating: 'bg-yellow-100 text-yellow-700',
-      ready: 'bg-green-100 text-green-700',
-      exporting: 'bg-purple-100 text-purple-700',
-      exported: 'bg-blue-100 text-blue-700',
-      failed: 'bg-red-100 text-red-700',
-    };
-
-    return styles[status] || 'bg-gray-100 text-gray-600';
-  };
-
   return (
     <DashboardLayout>
       <div className="space-y-6">
-
+        {/* Back Link */}
         <Link
           href="/books"
           className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-800"
@@ -103,9 +125,9 @@ export default function BookPage() {
           Back to Books
         </Link>
 
+        {/* Book Header */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
           <div className="flex items-center justify-between">
-
             <div>
               <h1 className="text-2xl font-bold text-gray-800">
                 {book.title}
@@ -127,21 +149,25 @@ export default function BookPage() {
               </span>
 
               <button
-                className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
                 type="button"
+                onClick={() =>
+                  setRefreshKey((prev) => prev + 1)
+                }
+                className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                aria-label="Refresh book"
               >
                 <RefreshCw size={18} />
               </button>
             </div>
-
           </div>
 
+          {/* Book Statistics */}
           <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
-
             <div className="bg-gray-50 rounded-lg p-4 text-center">
               <p className="text-2xl font-bold text-gray-800">
                 {book.puzzleCount}
               </p>
+
               <p className="text-sm text-gray-500">
                 Total Puzzles
               </p>
@@ -151,6 +177,7 @@ export default function BookPage() {
               <p className="text-2xl font-bold text-gray-800">
                 {book.bookPuzzles?.length || 0}
               </p>
+
               <p className="text-sm text-gray-500">
                 Generated
               </p>
@@ -160,6 +187,7 @@ export default function BookPage() {
               <p className="text-2xl font-bold text-gray-800">
                 {book.qualityScore ?? 'N/A'}
               </p>
+
               <p className="text-sm text-gray-500">
                 Quality Score
               </p>
@@ -174,26 +202,60 @@ export default function BookPage() {
                 {new Date(book.createdAt).toLocaleDateString()}
               </p>
             </div>
-
           </div>
         </div>
 
+        {/* Generation Progress */}
+        {(book.status === 'pending' ||
+          book.status === 'generating' ||
+          book.status === 'failed') && (
+          <GenerationProgress
+            bookId={book.id}
+            onComplete={handleGenerationComplete}
+            onError={handleGenerationError}
+          />
+        )}
+
+        {/* Puzzles Section */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
           <h2 className="text-lg font-semibold text-gray-800 mb-4">
             Puzzles
           </h2>
 
-          <div className="text-center py-12 text-gray-500">
-            <p>
-              Puzzle editor coming soon...
-            </p>
+          {book.bookPuzzles &&
+          book.bookPuzzles.length > 0 ? (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {book.bookPuzzles.map((bp, index) => (
+                <div
+                  key={bp.id}
+                  className="bg-gray-50 rounded-lg p-3 text-center border border-gray-100"
+                >
+                  <p className="text-sm font-medium text-gray-700">
+                    #{index + 1}
+                  </p>
 
-            <p className="text-sm mt-1">
-              You will be able to view, regenerate, and reorder puzzles here
-            </p>
-          </div>
+                  <p className="text-xs text-gray-400">
+                    Puzzle {index + 1}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12 text-gray-500">
+              <p>No puzzles generated yet</p>
+
+              <p className="text-sm mt-1">
+                {book.status === 'pending'
+                  ? 'Generation is queued...'
+                  : book.status === 'generating'
+                    ? 'Generation in progress...'
+                    : book.status === 'failed'
+                      ? 'Generation failed. Please try again.'
+                      : 'Puzzles will appear here when generation is complete'}
+              </p>
+            </div>
+          )}
         </div>
-
       </div>
     </DashboardLayout>
   );

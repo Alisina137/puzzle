@@ -1,5 +1,5 @@
 import { Queue, Worker, Job } from "bullmq";
-import { redisConnection, isRedisConfigured } from "@/lib/redis.js";
+import { redisConnection, isRedisConfigured } from "@/lib/redis";
 
 // Define queue names
 export const QUEUE_NAMES = {
