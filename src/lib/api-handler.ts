@@ -5,7 +5,12 @@ import { Prisma } from "@prisma/client";
 export type ApiHandler<
   P extends Record<string, string> = Record<string, string>,
   T extends NextResponse = NextResponse,
-> = (req: NextRequest, context: { params: P }) => Promise<T>;
+> = (
+  req: NextRequest,
+  context: {
+    params: Promise<P>;
+  },
+) => Promise<T>;
 
 export function handleApiError(error: unknown): NextResponse {
   console.error("API Error:", error);
@@ -45,8 +50,11 @@ export function withApiHandler<
   T extends NextResponse = NextResponse,
 >(
   handler: ApiHandler<P, T>,
-): (req: NextRequest, context: { params: P }) => Promise<T> {
-  return async (req: NextRequest, context: { params: P }): Promise<T> => {
+): (req: NextRequest, context: { params: Promise<P> }) => Promise<T> {
+  return async (
+    req: NextRequest,
+    context: { params: Promise<P> },
+  ): Promise<T> => {
     try {
       return await handler(req, context);
     } catch (error) {
@@ -55,16 +63,16 @@ export function withApiHandler<
   };
 }
 
-// Helper for authenticated routes.
-// Authentication is handled by getServerSession(authOptions)
-// inside the actual route handlers.
 export function withAuth<
   P extends Record<string, string> = Record<string, string>,
   T extends NextResponse = NextResponse,
 >(
   handler: ApiHandler<P, T>,
-): (req: NextRequest, context: { params: P }) => Promise<T> {
-  return async (req: NextRequest, context: { params: P }): Promise<T> => {
+): (req: NextRequest, context: { params: Promise<P> }) => Promise<T> {
+  return async (
+    req: NextRequest,
+    context: { params: Promise<P> },
+  ): Promise<T> => {
     try {
       return await handler(req, context);
     } catch (error) {

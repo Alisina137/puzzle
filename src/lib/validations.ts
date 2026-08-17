@@ -12,13 +12,14 @@ export const updateBookSchema = z.object({
   theme: z.string().min(1, 'Theme is required').optional(),
 });
 
+// Book ID schema - accept string that is a valid CUID or UUID
 export const bookIdSchema = z.object({
-  bookId: z.string().uuid('Invalid book ID format'),
+  bookId: z.string().min(1, 'Book ID is required'),
 });
 
 // Puzzle Schemas
 export const puzzleIdSchema = z.object({
-  puzzleId: z.string().uuid('Invalid puzzle ID format'),
+  puzzleId: z.string().min(1, 'Puzzle ID is required'),
 });
 
 export const createPuzzleSchema = z.object({
@@ -28,18 +29,18 @@ export const createPuzzleSchema = z.object({
 });
 
 export const regeneratePuzzleSchema = z.object({
-  bookPuzzleId: z.string().uuid('Invalid book puzzle ID'),
+  bookPuzzleId: z.string().min(1, 'Book puzzle ID is required'),
 });
 
 // Reorder Schema
 export const reorderPuzzlesSchema = z.object({
-  order: z.array(z.string().uuid('Invalid puzzle ID format')).min(1, 'At least one puzzle is required'),
+  order: z.array(z.string().min(1, 'Invalid puzzle ID format')).min(1, 'At least one puzzle is required'),
 });
 
 // Export Schemas
 export const exportBookSchema = z.object({
   includeSolutions: z.boolean().default(true),
-  templateId: z.string().uuid('Invalid template ID').optional(),
+  templateId: z.string().optional(),
   pageSize: z.enum(['A4', 'Letter']).default('A4'),
 });
 

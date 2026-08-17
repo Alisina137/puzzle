@@ -1,9 +1,9 @@
-"use client";
+'use client';
 
-import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import Link from "next/link";
-import { PlusCircle, BookOpen, ArrowRight, Loader2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { DashboardLayout } from '@/components/layout/DashboardLayout';
+import Link from 'next/link';
+import { PlusCircle, BookOpen, ArrowRight, Loader2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 interface Book {
   id: string;
@@ -23,12 +23,25 @@ export default function BooksPage() {
   useEffect(() => {
     async function fetchBooks() {
       try {
-        const response = await fetch("/api/books");
-        if (!response.ok) throw new Error("Failed to fetch books");
+        const response = await fetch('/api/books');
+        console.log('Response status:', response.status);
+        
+        if (response.status === 401) {
+          window.location.href = '/login';
+          return;
+        }
+        
+        if (!response.ok) throw new Error('Failed to fetch books');
         const result = await response.json();
-        setBooks(result.data.books || []);
+        console.log('API Response:', result);
+        
+        // Extract books from the response
+        const booksData = result.data?.books || result.data || [];
+        console.log('Books data:', booksData);
+        setBooks(booksData);
       } catch (error) {
-        setError("Failed to load books");
+        console.error('Error fetching books:', error);
+        setError('Failed to load books');
       } finally {
         setLoading(false);
       }
@@ -38,15 +51,44 @@ export default function BooksPage() {
 
   const getStatusBadge = (status: string) => {
     const styles: Record<string, string> = {
-      pending: "bg-gray-100 text-gray-600",
-      generating: "bg-yellow-100 text-yellow-700",
-      ready: "bg-green-100 text-green-700",
-      exporting: "bg-purple-100 text-purple-700",
-      exported: "bg-blue-100 text-blue-700",
-      failed: "bg-red-100 text-red-700",
+      pending: 'bg-gray-100 text-gray-600',
+      generating: 'bg-yellow-100 text-yellow-700',
+      ready: 'bg-green-100 text-green-700',
+      exporting: 'bg-purple-100 text-purple-700',
+      exported: 'bg-blue-100 text-blue-700',
+      failed: 'bg-red-100 text-red-700',
     };
-    return styles[status] || "bg-gray-100 text-gray-600";
+    return styles[status] || 'bg-gray-100 text-gray-600';
   };
+
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
+          <Loader2 size={32} className="animate-spin text-blue-600 mx-auto" />
+          <p className="text-gray-500 mt-2">Loading your books...</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <DashboardLayout>
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
+          <p className="text-red-500">{error}</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            Retry
+          </button>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  console.log('Rendering books:', books.length);
 
   return (
     <DashboardLayout>
@@ -65,21 +107,10 @@ export default function BooksPage() {
           </Link>
         </div>
 
-        {loading ? (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
-            <Loader2 size={32} className="animate-spin text-blue-600 mx-auto" />
-            <p className="text-gray-500 mt-2">Loading your books...</p>
-          </div>
-        ) : error ? (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
-            <p className="text-red-500">{error}</p>
-          </div>
-        ) : books.length === 0 ? (
+        {books.length === 0 ? (
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
             <BookOpen size={48} className="text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-800 mb-2">
-              No books yet
-            </h3>
+            <h3 className="text-lg font-semibold text-gray-800 mb-2">No books yet</h3>
             <p className="text-gray-500 text-sm mb-4">
               Create your first puzzle book to get started.
             </p>
@@ -96,7 +127,7 @@ export default function BooksPage() {
             {books.map((book) => (
               <Link
                 key={book.id}
-                href={"/books/" + book.id}
+                href={'/books/' + book.id}
                 className="bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow p-6 group"
               >
                 <div className="flex items-start justify-between">
@@ -106,19 +137,12 @@ export default function BooksPage() {
                     </h3>
                     <p className="text-sm text-gray-500">Theme: {book.theme}</p>
                   </div>
-                  <span
-                    className={
-                      "px-2 py-0.5 text-xs rounded-full " +
-                      getStatusBadge(book.status)
-                    }
-                  >
+                  <span className={'px-2 py-0.5 text-xs rounded-full ' + getStatusBadge(book.status)}>
                     {book.status}
                   </span>
                 </div>
                 <div className="mt-3 flex items-center justify-between">
-                  <span className="text-sm text-gray-500">
-                    {book.puzzleCount} puzzles
-                  </span>
+                  <span className="text-sm text-gray-500">{book.puzzleCount} puzzles</span>
                   <span className="text-blue-600 group-hover:translate-x-1 transition-transform">
                     <ArrowRight size={16} />
                   </span>

@@ -1,5 +1,5 @@
-import { prisma } from '@/lib/prisma';
-import { generationQueue, getQueueStatus } from '@/lib/queue.js';
+﻿import { prisma } from '@/lib/prisma';
+import { generationQueue } from '@/lib/queue';
 
 export interface ProgressStatus {
   bookId: string;
@@ -14,19 +14,16 @@ export interface ProgressStatus {
 }
 
 export class ProgressService {
+  /**
+   * Get the current generation progress for a book.
+   */
   static async getProgress(bookId: string): Promise<ProgressStatus> {
     const book = await prisma.book.findUnique({
-      where: { id: bookId },
-      select: {
-        id: true,
-        status: true,
-        puzzleCount: true,
-        qualityScore: true,
-        bookPuzzles: {
-          select: {
-            id: true,
-          },
-        },
+      where: {
+        id: bookId,
+      },
+      include: {
+        bookPuzzles: true,
       },
     });
 
@@ -34,82 +31,93 @@ export class ProgressService {
       throw new Error('Book not found');
     }
 
-    const jobs = await generationQueue.getJobs(['active', 'waiting', 'completed', 'failed']);
-    const job = jobs.find((j) => j.data.bookId === bookId);
+    const generated = book.bookPuzzles.length;
+    const total = book.puzzleCount;
+
+    const calculatedProgress =
+      total > 0
+        ? Math.round((generated / total) * 100)
+        : 0;
 
     const progress: ProgressStatus = {
       bookId: book.id,
-      status: book.status as 'pending' | 'generating' | 'ready' | 'failed',
-      progress: 0,
-      generated: book.bookPuzzles?.length || 0,
-      total: book.puzzleCount,
+      status: book.status as ProgressStatus['status'],
+      progress: calculatedProgress,
+      generated,
+      total,
       failedPuzzles: 0,
-      qualityScore: book.qualityScore || undefined,
+      qualityScore: book.qualityScore
+        ? Number(book.qualityScore)
+        : undefined,
     };
 
-    if (job) {
-      progress.jobId = job.id;
-      progress.progress = job.progress || 0;
+    // Find the active generation job for this book.
+    try {
+      const jobs = await generationQueue.getJobs([
+        'waiting',
+        'active',
+        'delayed',
+      ]);
 
-      if (job.failedReason) {
-        progress.error = job.failedReason;
-      }
+      const job = jobs.find(
+        (candidate) => candidate.data?.bookId === bookId,
+      );
 
-      if (job.returnvalue) {
-        const result = job.returnvalue as any;
-        progress.failedPuzzles = result.failedPuzzles || 0;
+      if (job) {
+        progress.jobId = job.id;
+
+        progress.progress =
+          typeof job.progress === 'number'
+            ? job.progress
+            : calculatedProgress;
+
+        if (book.status === 'pending') {
+          progress.status = 'pending';
+        } else if (book.status === 'generating') {
+          progress.status = 'generating';
+        }
       }
-    } else if (book.status === 'ready') {
-      progress.progress = 100;
-    } else if (book.status === 'failed') {
-      progress.progress = 0;
+    } catch (error) {
+      console.error(
+        'Failed to get generation job progress:',
+        error,
+      );
     }
 
     return progress;
   }
 
-  static async getQueueStatus() {
-    return getQueueStatus('puzzle-generation');
-  }
+  /**
+   * Cancel the active generation job for a book.
+   */
+  static async cancelGeneration(
+    bookId: string,
+  ): Promise<boolean> {
+    try {
+      const jobs = await generationQueue.getJobs([
+        'waiting',
+        'active',
+        'delayed',
+      ]);
 
-  static async cancelGeneration(bookId: string): Promise<boolean> {
-    const jobs = await generationQueue.getJobs(['active', 'waiting']);
-    const job = jobs.find((j) => j.data.bookId === bookId);
+      const job = jobs.find(
+        (candidate) => candidate.data?.bookId === bookId,
+      );
 
-    if (!job) {
-      return false;
+      if (!job) {
+        return false;
+      }
+
+      await job.remove();
+
+      return true;
+    } catch (error) {
+      console.error(
+        'Failed to cancel generation:',
+        error,
+      );
+
+      throw error;
     }
-
-    await job.remove();
-    return true;
-  }
-
-  static formatProgress(progress: ProgressStatus): string {
-    const percentage = progress.progress || 0;
-    const statusEmojis: Record<string, string> = {
-      pending: '?',
-      generating: '??',
-      ready: '?',
-      failed: '?',
-    };
-
-    const emoji = statusEmojis[progress.status] || '?';
-    const statusText = progress.status.charAt(0).toUpperCase() + progress.status.slice(1);
-
-    let message = emoji + ' ' + statusText + ': ' + percentage + '%';
-
-    if (progress.generated > 0) {
-      message = message + ' (' + progress.generated + '/' + progress.total + ' puzzles)';
-    }
-
-    if (progress.failedPuzzles > 0) {
-      message = message + ' ?? ' + progress.failedPuzzles + ' failed';
-    }
-
-    if (progress.error) {
-      message = message + ' ? Error: ' + progress.error;
-    }
-
-    return message;
   }
 }

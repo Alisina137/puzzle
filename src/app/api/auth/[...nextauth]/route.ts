@@ -1,3 +1,4 @@
-import { GET, POST } from '@/lib/auth';
+import { auth } from "@/lib/auth";
 
-export { GET, POST };
+export const GET = auth;
+export const POST = auth;
