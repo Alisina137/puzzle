@@ -1,10 +1,11 @@
-import { prisma } from '@/lib/prisma';
-import { WordSelectionService } from '@/modules/theme/word-selection.service.js';
-import { GridGenerator } from '@/modules/puzzle/grid-generator.js';
-import { WordPlacer } from '@/modules/puzzle/word-placer.js';
-import { PuzzleValidator } from '@/modules/puzzle/puzzle-validator.js';
-import { DuplicateDetector } from '@/modules/puzzle/duplicate-detector.js';
-import { SolutionGenerator } from '@/modules/puzzle/solution-generator.js';
+import { prisma } from "@/lib/prisma";
+import { WordSelectionService } from "@/modules/theme/word-selection.service.js";
+import { GridGenerator } from "@/modules/puzzle/grid-generator.js";
+import { WordPlacer } from "@/modules/puzzle/word-placer.js";
+import { PuzzleValidator } from "@/modules/puzzle/puzzle-validator.js";
+import { DuplicateDetector } from "@/modules/puzzle/duplicate-detector.js";
+import { SolutionGenerator } from "@/modules/puzzle/solution-generator.js";
+import { Prisma } from "@prisma/client";
 
 export interface GenerationResult {
   bookId: string;
@@ -38,13 +39,13 @@ export class GenerationService {
       });
 
       if (!book) {
-        throw new Error('Book not found');
+        throw new Error("Book not found");
       }
 
       // Update book status to generating
       await prisma.book.update({
         where: { id: bookId },
-        data: { status: 'generating' },
+        data: { status: "generating" },
       });
 
       result.totalPuzzles = book.puzzleCount;
@@ -55,13 +56,13 @@ export class GenerationService {
         wordResult = WordSelectionService.selectWords({
           theme: book.theme,
           count: 12,
-          difficulty: 'medium',
+          difficulty: "medium",
         });
       } catch (error: any) {
-        result.errors.push('Failed to select words: ' + error.message);
+        result.errors.push("Failed to select words: " + error.message);
         await prisma.book.update({
           where: { id: bookId },
-          data: { status: 'failed' },
+          data: { status: "failed" },
         });
         return result;
       }
@@ -74,7 +75,7 @@ export class GenerationService {
       for (let i = 0; i < book.puzzleCount; i++) {
         try {
           // Generate grid
-          const gridResult = GridGenerator.generate({ difficulty: 'medium' });
+          const gridResult = GridGenerator.generate({ difficulty: "medium" });
           const grid = gridResult.grid;
 
           // Place words
@@ -86,18 +87,28 @@ export class GenerationService {
 
           // Track failed words
           if (placement.failedWords.length > 0) {
-            result.warnings.push('Puzzle ' + (i + 1) + ' failed words: ' + placement.failedWords.join(', '));
+            result.warnings.push(
+              "Puzzle " +
+                (i + 1) +
+                " failed words: " +
+                placement.failedWords.join(", "),
+            );
           }
 
           // Validate puzzle
           const validation = PuzzleValidator.validatePuzzle(
             placement.grid,
             words,
-            placement.placedWords
+            placement.placedWords,
           );
 
           if (!validation.valid) {
-            result.errors.push('Puzzle ' + (i + 1) + ' validation failed: ' + validation.errors.join(', '));
+            result.errors.push(
+              "Puzzle " +
+                (i + 1) +
+                " validation failed: " +
+                validation.errors.join(", "),
+            );
             result.failedPuzzles++;
             continue;
           }
@@ -106,43 +117,71 @@ export class GenerationService {
           const fingerprint = DuplicateDetector.createFingerprint(
             placement.grid,
             words,
-            placement.placedWords
+            placement.placedWords,
           );
 
-          const duplicateCheck = DuplicateDetector.isDuplicate(fingerprint, allFingerprints);
+          const duplicateCheck = DuplicateDetector.isDuplicate(
+            fingerprint,
+            allFingerprints,
+          );
           if (duplicateCheck && duplicateCheck.isDuplicate) {
-            result.warnings.push('Puzzle ' + (i + 1) + ' appears to be a duplicate (score: ' + (duplicateCheck.score * 100).toFixed(1) + '%)');
+            result.warnings.push(
+              "Puzzle " +
+                (i + 1) +
+                " appears to be a duplicate (score: " +
+                (duplicateCheck.score * 100).toFixed(1) +
+                "%)",
+            );
             // Allow duplicates but warn (for now)
           }
           allFingerprints.push(fingerprint);
 
           // Generate solution
-          const solution = SolutionGenerator.generateSolution(placement.grid, placement.placedWords);
-          const verification = SolutionGenerator.verifySolution(solution, placement.grid, words);
+          const solution = SolutionGenerator.generateSolution(
+            placement.grid,
+            placement.placedWords,
+          );
+          const verification = SolutionGenerator.verifySolution(
+            solution,
+            placement.grid,
+            words,
+          );
 
           if (!verification.valid) {
-            result.errors.push('Puzzle ' + (i + 1) + ' solution verification failed: ' + verification.errors.join(', '));
+            result.errors.push(
+              "Puzzle " +
+                (i + 1) +
+                " solution verification failed: " +
+                verification.errors.join(", "),
+            );
             result.failedPuzzles++;
             continue;
           }
 
           // Save puzzle to database
-          await this.savePuzzle(bookId, placement, words, solution, validation.score);
+          await this.savePuzzle(
+            bookId,
+            placement,
+            words,
+            solution,
+            validation.score,
+          );
 
           result.generatedPuzzles++;
-
         } catch (error: any) {
-          result.errors.push('Puzzle ' + (i + 1) + ' generation failed: ' + error.message);
+          result.errors.push(
+            "Puzzle " + (i + 1) + " generation failed: " + error.message,
+          );
           result.failedPuzzles++;
         }
       }
 
       // Update book status
-      let status = 'ready';
+      let status = "ready";
       if (result.failedPuzzles > 0 && result.generatedPuzzles === 0) {
-        status = 'failed';
+        status = "failed";
       } else if (result.failedPuzzles > 0) {
-        status = 'ready';
+        status = "ready";
       }
 
       await prisma.book.update({
@@ -154,12 +193,11 @@ export class GenerationService {
       });
 
       return result;
-
     } catch (error: any) {
-      result.errors.push('Generation failed: ' + error.message);
+      result.errors.push("Generation failed: " + error.message);
       await prisma.book.update({
         where: { id: bookId },
-        data: { status: 'failed' },
+        data: { status: "failed" },
       });
       return result;
     }
@@ -173,19 +211,19 @@ export class GenerationService {
     placement: any,
     words: string[],
     solution: any,
-    qualityScore: number
+    qualityScore: number,
   ): Promise<void> {
     // Create puzzle
     const puzzle = await prisma.puzzle.create({
       data: {
-        type: 'wordsearch',
+        type: "wordsearch",
         data: {
           grid: placement.grid,
           words: words,
           placedWords: placement.placedWords,
           size: placement.grid.length,
         },
-        difficulty: 'medium',
+        difficulty: "medium",
         qualityScore: qualityScore,
       },
     });
@@ -195,7 +233,7 @@ export class GenerationService {
       data: {
         puzzleId: puzzle.id,
         versionNumber: 1,
-        data: puzzle.data,
+        data: puzzle.data === null ? Prisma.JsonNull : puzzle.data,
         isActive: true,
       },
     });
@@ -243,6 +281,9 @@ export class GenerationService {
     const errorPenalty = result.errors.length * 2;
     const warningPenalty = result.warnings.length * 0.5;
 
-    return Math.max(0, Math.min(100, baseScore - errorPenalty - warningPenalty));
+    return Math.max(
+      0,
+      Math.min(100, baseScore - errorPenalty - warningPenalty),
+    );
   }
 }

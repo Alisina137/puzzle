@@ -1,16 +1,18 @@
-import { Queue, Worker, Job } from 'bullmq';
-import { redisConnection, isRedisConfigured } from '@/lib/redis.js';
+import { Queue, Worker, Job } from "bullmq";
+import { redisConnection, isRedisConfigured } from "@/lib/redis.js";
 
 // Define queue names
 export const QUEUE_NAMES = {
-  GENERATION: 'puzzle-generation',
-  EXPORT: 'puzzle-export',
+  GENERATION: "puzzle-generation",
+  EXPORT: "puzzle-export",
 } as const;
 
 // Check if Redis is configured
 if (!isRedisConfigured()) {
-  console.warn('?? Redis is not configured. Queue features will not work.');
-  console.warn('Please set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN or REDIS_URL in .env');
+  console.warn("?? Redis is not configured. Queue features will not work.");
+  console.warn(
+    "Please set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN or REDIS_URL in .env",
+  );
 }
 
 // Create generation queue
@@ -19,7 +21,7 @@ export const generationQueue = new Queue(QUEUE_NAMES.GENERATION, {
   defaultJobOptions: {
     attempts: 3,
     backoff: {
-      type: 'exponential',
+      type: "exponential",
       delay: 1000,
     },
     removeOnComplete: {
@@ -30,7 +32,6 @@ export const generationQueue = new Queue(QUEUE_NAMES.GENERATION, {
       age: 604800, // 7 days
       count: 50,
     },
-    timeout: 600000, // 10 minutes
   },
 });
 
@@ -40,7 +41,7 @@ export const exportQueue = new Queue(QUEUE_NAMES.EXPORT, {
   defaultJobOptions: {
     attempts: 3,
     backoff: {
-      type: 'exponential',
+      type: "exponential",
       delay: 1000,
     },
     removeOnComplete: {
@@ -61,7 +62,8 @@ export async function getQueueStatus(queueName: string): Promise<{
   completed: number;
   failed: number;
 }> {
-  const queue = queueName === QUEUE_NAMES.GENERATION ? generationQueue : exportQueue;
+  const queue =
+    queueName === QUEUE_NAMES.GENERATION ? generationQueue : exportQueue;
   const [waiting, active, completed, failed] = await Promise.all([
     queue.getWaitingCount(),
     queue.getActiveCount(),
@@ -72,8 +74,12 @@ export async function getQueueStatus(queueName: string): Promise<{
 }
 
 // Clean up old jobs
-export async function cleanQueue(queueName: string, age: number = 86400): Promise<void> {
-  const queue = queueName === QUEUE_NAMES.GENERATION ? generationQueue : exportQueue;
-  await queue.clean(age * 1000, 1000, 'completed');
-  await queue.clean(age * 1000, 1000, 'failed');
+export async function cleanQueue(
+  queueName: string,
+  age: number = 86400,
+): Promise<void> {
+  const queue =
+    queueName === QUEUE_NAMES.GENERATION ? generationQueue : exportQueue;
+  await queue.clean(age * 1000, 1000, "completed");
+  await queue.clean(age * 1000, 1000, "failed");
 }
