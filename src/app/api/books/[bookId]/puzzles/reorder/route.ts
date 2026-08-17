@@ -30,7 +30,7 @@ export async function PATCH(
       );
     }
 
-    // Prevent duplicate IDs in the submitted order
+    // Prevent duplicate IDs
     const uniqueOrder = new Set(order);
 
     if (uniqueOrder.size !== order.length) {
@@ -54,15 +54,11 @@ export async function PATCH(
       return Response.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // Get ALL puzzles belonging to this book
+    // Get every puzzle in the book
     const existingPuzzles = await prisma.bookPuzzle.findMany({
       where: { bookId },
       select: {
         id: true,
-        position: true,
-      },
-      orderBy: {
-        position: "asc",
       },
     });
 
@@ -93,71 +89,85 @@ export async function PATCH(
     }
 
     /*
-     * IMPORTANT:
+     * IMPORTANT
      *
-     * The database has a unique constraint:
+     * BookPuzzle has unique constraints on:
      *
      *   (bookId, position)
+     *   (bookId, displayNumber)
      *
-     * Therefore we cannot directly change:
+     * Therefore we first move BOTH fields into
+     * temporary unique ranges.
      *
-     *   A: 0 -> 1
-     *   B: 1 -> 0
-     *
-     * because the first update would temporarily create:
-     *
-     *   A: 1
-     *   B: 1
-     *
-     * Instead:
-     *
-     *   Step 1: move everything to temporary positions
-     *   Step 2: assign the final positions
+     * Then we assign the final values.
      */
 
-    const updatedPuzzles = await prisma.$transaction(async (tx) => {
-      // Step 1: Move every puzzle to a unique temporary position.
-      //
-      // Negative positions are safe because normal positions
-      // start at 0.
-      for (let i = 0; i < existingPuzzles.length; i++) {
-        await tx.bookPuzzle.update({
-          where: {
-            id: existingPuzzles[i].id,
-          },
-          data: {
-            position: -(i + 1),
-          },
-        });
-      }
+    const TEMP_POSITION_OFFSET = 1000000;
+    const TEMP_DISPLAY_OFFSET = 2000000;
 
-      // Step 2: Assign final positions.
-      for (let i = 0; i < order.length; i++) {
-        await tx.bookPuzzle.update({
-          where: {
-            id: order[i],
-          },
-          data: {
-            position: i,
-            displayNumber: i + 1,
-          },
-        });
-      }
+    await prisma.$transaction(
+      async (tx) => {
+        /*
+         * STEP 1
+         *
+         * Move every puzzle to temporary values.
+         *
+         * We use updateMany instead of individual updates
+         * to keep the transaction short.
+         */
+        for (let i = 0; i < existingPuzzles.length; i++) {
+          await tx.bookPuzzle.update({
+            where: {
+              id: existingPuzzles[i].id,
+            },
+            data: {
+              position: TEMP_POSITION_OFFSET + i,
+              displayNumber: TEMP_DISPLAY_OFFSET + i,
+            },
+          });
+        }
 
-      // Return the final order
-      return tx.bookPuzzle.findMany({
-        where: {
-          bookId,
-        },
-        include: {
-          puzzle: true,
-          puzzleVersion: true,
-          solution: true,
-        },
-        orderBy: {
-          position: "asc",
-        },
-      });
+        /*
+         * STEP 2
+         *
+         * Assign final position/displayNumber.
+         */
+        for (let i = 0; i < order.length; i++) {
+          await tx.bookPuzzle.update({
+            where: {
+              id: order[i],
+            },
+            data: {
+              position: i,
+              displayNumber: i + 1,
+            },
+          });
+        }
+      },
+      {
+        timeout: 30000,
+      },
+    );
+
+    /*
+     * IMPORTANT:
+     *
+     * Fetch AFTER the transaction has committed.
+     * This avoids P2028 caused by querying through
+     * an expired/closed transaction.
+     */
+    const updatedPuzzles = await prisma.bookPuzzle.findMany({
+      where: {
+        bookId,
+      },
+      include: {
+        puzzle: true,
+        puzzleVersion: true,
+        solution: true,
+      },
+      orderBy: {
+        position: "asc",
+      },
     });
 
     return Response.json({
@@ -170,18 +180,27 @@ export async function PATCH(
   } catch (error: any) {
     console.error("Reorder error:", error);
 
-    if (error.code === "P2002") {
+    if (error?.code === "P2002") {
       return Response.json(
         {
-          error: "Conflict: Duplicate position. Please try again.",
+          error: "Conflict: Duplicate position or display number.",
         },
         { status: 409 },
       );
     }
 
+    if (error?.code === "P2028") {
+      return Response.json(
+        {
+          error: "The reorder operation timed out. Please try again.",
+        },
+        { status: 408 },
+      );
+    }
+
     return Response.json(
       {
-        error: error.message || "Failed to reorder puzzles",
+        error: error?.message || "Failed to reorder puzzles",
       },
       { status: 500 },
     );

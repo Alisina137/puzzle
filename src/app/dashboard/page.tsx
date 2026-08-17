@@ -3,14 +3,52 @@
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { useAuth } from '@/hooks/useAuth';
 import { BookOpen, PlusCircle, TrendingUp } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+
+interface DashboardStats {
+  totalBooks: number;
+  totalPuzzles: number;
+  booksCreated: number;
+}
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const [stats, setStats] = useState<DashboardStats>({
+    totalBooks: 0,
+    totalPuzzles: 0,
+    booksCreated: 0,
+  });
+  const [loading, setLoading] = useState(true);
 
-  const stats = [
-    { label: 'Total Books', value: '0', icon: BookOpen },
-    { label: 'Total Puzzles', value: '0', icon: TrendingUp },
-    { label: 'Books Created', value: '0', icon: PlusCircle },
+  useEffect(() => {
+    async function fetchStats() {
+      try {
+        const response = await fetch('/api/books');
+        if (response.ok) {
+          const result = await response.json();
+          const books = result.data?.books || [];
+          const totalPuzzles = books.reduce((sum: number, book: any) => sum + book.puzzleCount, 0);
+          
+          setStats({
+            totalBooks: books.length,
+            totalPuzzles: totalPuzzles,
+            booksCreated: books.length,
+          });
+        }
+      } catch (error) {
+        console.error('Failed to fetch stats:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchStats();
+  }, []);
+
+  const statItems = [
+    { label: 'Total Books', value: stats.totalBooks, icon: BookOpen },
+    { label: 'Total Puzzles', value: stats.totalPuzzles, icon: TrendingUp },
+    { label: 'Books Created', value: stats.booksCreated, icon: PlusCircle },
   ];
 
   return (
@@ -28,7 +66,7 @@ export default function DashboardPage() {
 
         {/* Stats Section */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {stats.map((stat) => {
+          {statItems.map((stat) => {
             const Icon = stat.icon;
             return (
               <div
@@ -40,7 +78,9 @@ export default function DashboardPage() {
                     <Icon size={24} className="text-blue-600" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold text-gray-800">{stat.value}</p>
+                    <p className="text-2xl font-bold text-gray-800">
+                      {loading ? '...' : stat.value}
+                    </p>
                     <p className="text-sm text-gray-500">{stat.label}</p>
                   </div>
                 </div>
@@ -53,27 +93,27 @@ export default function DashboardPage() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
           <h2 className="text-lg font-semibold text-gray-800 mb-4">Quick Actions</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <a
+            <Link
               href="/books/new"
               className="flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
             >
               <PlusCircle size={20} />
               Create New Book
-            </a>
-            <a
+            </Link>
+            <Link
               href="/books"
               className="flex items-center justify-center gap-2 px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
             >
               <BookOpen size={20} />
               View My Books
-            </a>
+            </Link>
           </div>
         </div>
 
         {/* Getting Started */}
         <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-6 border border-blue-100">
           <h2 className="text-lg font-semibold text-gray-800 mb-2">
-            Getting Started
+            ?? Getting Started
           </h2>
           <p className="text-gray-600 text-sm">
             Create your first puzzle book by clicking the "Create New Book" button above.

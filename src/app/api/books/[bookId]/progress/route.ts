@@ -7,7 +7,7 @@ import {
   bookIdSchema,
 } from "@/lib";
 import { authOptions } from "@/lib/auth";
-import { ProgressService } from "@/modules/generation/progress.service.js";
+import { ProgressService } from "@/modules/generation/progress.service";
 
 // Helper to verify book ownership
 async function verifyBookOwnership(bookId: string, userId: string) {
@@ -53,17 +53,11 @@ async function getProgress(
   const idValidation = validateSchema(bookIdSchema, { bookId });
 
   if (!idValidation.success) {
-    return apiResponse.badRequest(
-      "Invalid book ID",
-      idValidation.errors,
-    );
+    return apiResponse.badRequest("Invalid book ID", idValidation.errors);
   }
 
   // Verify ownership
-  const ownership = await verifyBookOwnership(
-    bookId,
-    session.user.id,
-  );
+  const ownership = await verifyBookOwnership(bookId, session.user.id);
 
   if (ownership.error) {
     return ownership.error;
@@ -75,9 +69,7 @@ async function getProgress(
     return apiResponse.success(progress);
   } catch (error: unknown) {
     const message =
-      error instanceof Error
-        ? error.message
-        : "Failed to get progress";
+      error instanceof Error ? error.message : "Failed to get progress";
 
     return apiResponse.internalError(message);
   }
@@ -101,30 +93,21 @@ async function cancelGeneration(
   const idValidation = validateSchema(bookIdSchema, { bookId });
 
   if (!idValidation.success) {
-    return apiResponse.badRequest(
-      "Invalid book ID",
-      idValidation.errors,
-    );
+    return apiResponse.badRequest("Invalid book ID", idValidation.errors);
   }
 
   // Verify ownership
-  const ownership = await verifyBookOwnership(
-    bookId,
-    session.user.id,
-  );
+  const ownership = await verifyBookOwnership(bookId, session.user.id);
 
   if (ownership.error) {
     return ownership.error;
   }
 
   try {
-    const cancelled =
-      await ProgressService.cancelGeneration(bookId);
+    const cancelled = await ProgressService.cancelGeneration(bookId);
 
     if (!cancelled) {
-      return apiResponse.notFound(
-        "No active generation job found",
-      );
+      return apiResponse.notFound("No active generation job found");
     }
 
     await prisma.book.update({
@@ -132,15 +115,10 @@ async function cancelGeneration(
       data: { status: "failed" },
     });
 
-    return apiResponse.success(
-      null,
-      "Generation cancelled",
-    );
+    return apiResponse.success(null, "Generation cancelled");
   } catch (error: unknown) {
     const message =
-      error instanceof Error
-        ? error.message
-        : "Failed to cancel generation";
+      error instanceof Error ? error.message : "Failed to cancel generation";
 
     return apiResponse.internalError(message);
   }

@@ -4,6 +4,8 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import Link from 'next/link';
 import { PlusCircle, BookOpen, ArrowRight, Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { BookCardSkeleton } from '@/components/ui/Skeleton';
+import { Pagination } from '@/components/ui/Pagination';
 
 interface Book {
   id: string;
@@ -15,16 +17,20 @@ interface Book {
   createdAt: string;
 }
 
+const PAGE_SIZE = 9;
+
 export default function BooksPage() {
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalBooks, setTotalBooks] = useState(0);
 
   useEffect(() => {
     async function fetchBooks() {
       try {
+        setLoading(true);
         const response = await fetch('/api/books');
-        console.log('Response status:', response.status);
         
         if (response.status === 401) {
           window.location.href = '/login';
@@ -33,12 +39,14 @@ export default function BooksPage() {
         
         if (!response.ok) throw new Error('Failed to fetch books');
         const result = await response.json();
-        console.log('API Response:', result);
+        console.log('Books API response:', result);
         
         // Extract books from the response
         const booksData = result.data?.books || result.data || [];
-        console.log('Books data:', booksData);
+        console.log('Books found:', booksData.length);
+        
         setBooks(booksData);
+        setTotalBooks(booksData.length);
       } catch (error) {
         console.error('Error fetching books:', error);
         setError('Failed to load books');
@@ -48,6 +56,13 @@ export default function BooksPage() {
     }
     fetchBooks();
   }, []);
+
+  // Pagination
+  const totalPages = Math.ceil(totalBooks / PAGE_SIZE);
+  const paginatedBooks = books.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE
+  );
 
   const getStatusBadge = (status: string) => {
     const styles: Record<string, string> = {
@@ -64,9 +79,19 @@ export default function BooksPage() {
   if (loading) {
     return (
       <DashboardLayout>
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
-          <Loader2 size={32} className="animate-spin text-blue-600 mx-auto" />
-          <p className="text-gray-500 mt-2">Loading your books...</p>
+        <div className="space-y-6">
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-800">My Books</h1>
+              <p className="text-gray-500 mt-1">Loading your books...</p>
+            </div>
+            <div className="w-32 h-10 bg-gray-200 rounded-lg animate-pulse" />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[...Array(6)].map((_, i) => (
+              <BookCardSkeleton key={i} />
+            ))}
+          </div>
         </div>
       </DashboardLayout>
     );
@@ -87,8 +112,6 @@ export default function BooksPage() {
       </DashboardLayout>
     );
   }
-
-  console.log('Rendering books:', books.length);
 
   return (
     <DashboardLayout>
@@ -123,33 +146,42 @@ export default function BooksPage() {
             </Link>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {books.map((book) => (
-              <Link
-                key={book.id}
-                href={'/books/' + book.id}
-                className="bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow p-6 group"
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-gray-800 truncate group-hover:text-blue-600 transition-colors">
-                      {book.title}
-                    </h3>
-                    <p className="text-sm text-gray-500">Theme: {book.theme}</p>
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {paginatedBooks.map((book) => (
+                <Link
+                  key={book.id}
+                  href={'/books/' + book.id}
+                  className="bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow p-6 group"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-gray-800 truncate group-hover:text-blue-600 transition-colors">
+                        {book.title}
+                      </h3>
+                      <p className="text-sm text-gray-500">Theme: {book.theme}</p>
+                    </div>
+                    <span className={'px-2 py-0.5 text-xs rounded-full ' + getStatusBadge(book.status)}>
+                      {book.status}
+                    </span>
                   </div>
-                  <span className={'px-2 py-0.5 text-xs rounded-full ' + getStatusBadge(book.status)}>
-                    {book.status}
-                  </span>
-                </div>
-                <div className="mt-3 flex items-center justify-between">
-                  <span className="text-sm text-gray-500">{book.puzzleCount} puzzles</span>
-                  <span className="text-blue-600 group-hover:translate-x-1 transition-transform">
-                    <ArrowRight size={16} />
-                  </span>
-                </div>
-              </Link>
-            ))}
-          </div>
+                  <div className="mt-3 flex items-center justify-between">
+                    <span className="text-sm text-gray-500">{book.puzzleCount} puzzles</span>
+                    <span className="text-blue-600 group-hover:translate-x-1 transition-transform">
+                      <ArrowRight size={16} />
+                    </span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+            {totalPages > 1 && (
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+              />
+            )}
+          </>
         )}
       </div>
     </DashboardLayout>
