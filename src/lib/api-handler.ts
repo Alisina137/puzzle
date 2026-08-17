@@ -8,7 +8,7 @@ export type ApiHandler<
 > = (
   req: NextRequest,
   context: {
-    params: Promise<P>;
+    params: P;
   },
 ) => Promise<T>;
 
@@ -18,7 +18,9 @@ export function handleApiError(error: unknown): NextResponse {
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
     switch (error.code) {
       case "P2002":
-        return apiResponse.conflict("A record with this value already exists");
+        return apiResponse.conflict(
+          "A record with this value already exists",
+        );
 
       case "P2025":
         return apiResponse.notFound("Record not found");
@@ -50,10 +52,10 @@ export function withApiHandler<
   T extends NextResponse = NextResponse,
 >(
   handler: ApiHandler<P, T>,
-): (req: NextRequest, context: { params: Promise<P> }) => Promise<T> {
+): (req: NextRequest, context: { params: P }) => Promise<T> {
   return async (
     req: NextRequest,
-    context: { params: Promise<P> },
+    context: { params: P },
   ): Promise<T> => {
     try {
       return await handler(req, context);
@@ -68,10 +70,10 @@ export function withAuth<
   T extends NextResponse = NextResponse,
 >(
   handler: ApiHandler<P, T>,
-): (req: NextRequest, context: { params: Promise<P> }) => Promise<T> {
+): (req: NextRequest, context: { params: P }) => Promise<T> {
   return async (
     req: NextRequest,
-    context: { params: Promise<P> },
+    context: { params: P },
   ): Promise<T> => {
     try {
       return await handler(req, context);

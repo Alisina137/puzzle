@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { apiResponse } from "@/lib/api-response";
 
 export async function GET(
   req: NextRequest,
@@ -11,16 +12,13 @@ export async function GET(
     const session = await getServerSession(authOptions);
 
     if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return apiResponse.unauthorized();
     }
 
     const { bookId } = await context.params;
 
     if (!bookId) {
-      return NextResponse.json(
-        { error: "Book ID is required" },
-        { status: 400 },
-      );
+      return apiResponse.badRequest("Book ID is required");
     }
 
     const book = await prisma.book.findUnique({
@@ -46,28 +44,23 @@ export async function GET(
     });
 
     if (!book) {
-      return NextResponse.json({ error: "Book not found" }, { status: 404 });
+      return apiResponse.notFound("Book not found");
     }
 
     if (book.userId !== session.user.id) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      return apiResponse.forbidden(
+        "You do not have permission to view this book",
+      );
     }
 
-    return NextResponse.json(
-      {
-        success: true,
-        data: book,
-      },
-      { status: 200 },
-    );
+    return apiResponse.success(book);
   } catch (error) {
     console.error("Error fetching book:", error);
 
-    return NextResponse.json(
-      {
-        error: error instanceof Error ? error.message : "Internal server error",
-      },
-      { status: 500 },
+    return apiResponse.internalError(
+      error instanceof Error
+        ? error.message
+        : "Internal server error",
     );
   }
 }
