@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { PuzzleCard } from "./PuzzleCard";
-import { Loader2 } from "lucide-react";
+import { PuzzleCard } from './PuzzleCard';
+import { Loader2 } from 'lucide-react';
 
 interface Puzzle {
   id: string;
@@ -29,7 +29,9 @@ interface PuzzleListProps {
   bookId: string;
   onRegenerate?: (puzzleId: string) => Promise<void>;
   onDelete?: (puzzleId: string) => Promise<void>;
+  onReorder?: (puzzleIds: string[]) => Promise<void>;
   loading?: boolean;
+  onPuzzleUpdate?: (updatedPuzzle: any) => void;
 }
 
 export function PuzzleList({
@@ -37,7 +39,9 @@ export function PuzzleList({
   bookId,
   onRegenerate,
   onDelete,
+  onReorder,
   loading = false,
+  onPuzzleUpdate,
 }: PuzzleListProps) {
   if (loading) {
     return (
@@ -47,13 +51,11 @@ export function PuzzleList({
     );
   }
 
-  if (!puzzles || puzzles.length === 0) {
+  if (puzzles.length === 0) {
     return (
       <div className="text-center py-12 text-gray-500">
-        <p>No puzzles generated yet.</p>
-        <p className="text-sm mt-1">
-          Puzzles will appear here when generation is complete.
-        </p>
+        <p>No puzzles generated yet</p>
+        <p className="text-sm mt-1">Puzzles will appear here when generation is complete</p>
       </div>
     );
   }
@@ -67,6 +69,7 @@ export function PuzzleList({
           bookId={bookId}
           onRegenerate={onRegenerate}
           onDelete={onDelete}
+          onUpdate={onPuzzleUpdate}
         />
       ))}
     </div>

@@ -2,10 +2,8 @@ import {
   ThemeKey,
   themeLabels,
   themeCategories,
-  themeWordLists,
-  isValidTheme,
-  getThemeWords,
-} from "./word-lists/index.js";
+  THEME_WORDS,
+} from "./word-lists/index";
 
 export interface WordSelectionOptions {
   theme: string;
@@ -36,100 +34,177 @@ export class WordSelectionService {
       seed,
     } = options;
 
-    // Validate theme
-    if (!isValidTheme(theme)) {
+    if (!(theme in THEME_WORDS)) {
       throw new Error(
-        `Invalid theme: ${theme}. Available themes: ${Object.keys(
-          themeWordLists,
-        ).join(", ")}`,
+        "Invalid theme: " +
+          theme +
+          ". Available themes: " +
+          Object.keys(THEME_WORDS).join(", "),
       );
     }
 
     const themeKey = theme as ThemeKey;
-    let allWords = getThemeWords(themeKey);
+    let allWords = THEME_WORDS[themeKey];
 
-    // Filter by word length
     allWords = allWords.filter(
       (word) => word.length >= minWordLength && word.length <= maxWordLength,
     );
 
-    // Exclude specified words
     allWords = allWords.filter((word) => !excludeWords.includes(word));
 
     if (allWords.length === 0) {
       throw new Error(
-        `No words available for theme "${theme}" with the specified criteria`,
+        'No words available for theme "' +
+          theme +
+          '" with the specified criteria',
       );
     }
 
-    // Select words based on difficulty
     let selectedWords: string[] = [];
     const wordCount = Math.min(count, allWords.length);
 
-    // Use seed for reproducible selection if provided
     let shuffled = this.shuffleArray(allWords, seed);
 
     switch (difficulty) {
       case "easy":
-        // Easy words: shorter words first
-        shuffled = [...shuffled].sort((a, b) => a.length - b.length);
-        selectedWords = shuffled.slice(0, wordCount);
+        const easyWords = shuffled.filter(
+          (w) => w.length >= 4 && w.length <= 7,
+        );
+        selectedWords = easyWords.slice(0, wordCount);
+        if (selectedWords.length < wordCount) {
+          const remaining = shuffled
+            .filter(
+              (w) =>
+                !selectedWords.includes(w) && w.length >= 5 && w.length <= 10,
+            )
+            .slice(0, wordCount - selectedWords.length);
+          selectedWords = [...selectedWords, ...remaining];
+        }
         break;
-
       case "hard":
-        // Hard words: longer words first
-        shuffled = [...shuffled].sort((a, b) => b.length - a.length);
-        selectedWords = shuffled.slice(0, wordCount);
+        const hardWords = shuffled.filter(
+          (w) => w.length >= 8 && w.length <= 15,
+        );
+        selectedWords = hardWords.slice(0, wordCount);
+        if (selectedWords.length < wordCount) {
+          const remaining = shuffled
+            .filter(
+              (w) =>
+                !selectedWords.includes(w) && w.length >= 6 && w.length <= 12,
+            )
+            .slice(0, wordCount - selectedWords.length);
+          selectedWords = [...selectedWords, ...remaining];
+        }
         break;
-
-      case "medium":
       default:
         selectedWords = shuffled.slice(0, wordCount);
         break;
     }
 
+    if (selectedWords.length < wordCount) {
+      const remaining = shuffled
+        .filter((w) => !selectedWords.includes(w))
+        .slice(0, wordCount - selectedWords.length);
+      selectedWords = [...selectedWords, ...remaining];
+    }
+
     return {
       words: selectedWords,
-      theme,
+      theme: themeKey,
       difficulty,
       totalAvailable: allWords.length,
     };
   }
 
-  private static shuffleArray(array: string[], seed?: number): string[] {
-    const result = [...array];
+  static selectMultipleSets(
+    options: WordSelectionOptions & { sets: number },
+  ): WordSelectionResult[] {
+    const { sets, ...baseOptions } = options;
+    const results: WordSelectionResult[] = [];
+    const usedWords: string[] = [];
 
-    if (seed !== undefined) {
-      const random = this.seededRandom(seed);
-
-      for (let i = result.length - 1; i > 0; i--) {
-        const j = Math.floor(random() * (i + 1));
-        [result[i], result[j]] = [result[j], result[i]];
-      }
-    } else {
-      for (let i = result.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [result[i], result[j]] = [result[j], result[i]];
-      }
+    for (let i = 0; i < sets; i++) {
+      const result = this.selectWords({
+        ...baseOptions,
+        excludeWords: [...(baseOptions.excludeWords || []), ...usedWords],
+        seed: baseOptions.seed ? baseOptions.seed + i : undefined,
+      });
+      results.push(result);
+      usedWords.push(...result.words);
     }
 
-    return result;
+    return results;
   }
 
-  private static seededRandom(seed: number): () => number {
-    let value = seed;
-
-    return () => {
-      value = (value * 9301 + 49297) % 233280;
-      return value / 233280;
+  static getThemeInfo(
+    theme: string,
+  ): { name: string; category: string; wordCount: number } | null {
+    if (!(theme in THEME_WORDS)) {
+      return null;
+    }
+    const themeKey = theme as ThemeKey;
+    return {
+      name: themeLabels[themeKey],
+      category: themeCategories[themeKey],
+      wordCount: THEME_WORDS[themeKey].length,
     };
   }
-}
 
-export function getThemeLabel(theme: ThemeKey): string {
-  return themeLabels[theme];
-}
+  static getAvailableThemes(): {
+    key: string;
+    name: string;
+    category: string;
+    wordCount: number;
+  }[] {
+    const themeKeys = Object.keys(THEME_WORDS) as ThemeKey[];
+    return themeKeys.map((key) => ({
+      key,
+      name: themeLabels[key],
+      category: themeCategories[key],
+      wordCount: THEME_WORDS[key].length,
+    }));
+  }
 
-export function getThemeCategory(theme: ThemeKey): string {
-  return themeCategories[theme];
+  static hasEnoughWords(
+    theme: string,
+    count: number,
+    minWordLength: number = 3,
+    maxWordLength: number = 15,
+  ): boolean {
+    if (!(theme in THEME_WORDS)) {
+      return false;
+    }
+    const themeKey = theme as ThemeKey;
+    const words = THEME_WORDS[themeKey].filter(
+      (word) => word.length >= minWordLength && word.length <= maxWordLength,
+    );
+    return words.length >= count;
+  }
+
+  private static shuffleArray<T>(array: T[], seed?: number): T[] {
+    const shuffled = [...array];
+    let currentIndex = shuffled.length;
+    let random: () => number;
+
+    if (seed !== undefined) {
+      let s = seed;
+      random = () => {
+        s = (s * 9301 + 49297) % 233280;
+        return s / 233280;
+      };
+    } else {
+      random = () => Math.random();
+    }
+
+    while (currentIndex !== 0) {
+      const randomIndex = Math.floor(random() * currentIndex);
+      currentIndex--;
+      [shuffled[currentIndex], shuffled[randomIndex]] = [
+        shuffled[randomIndex],
+        shuffled[currentIndex],
+      ];
+    }
+
+    return shuffled;
+  }
 }

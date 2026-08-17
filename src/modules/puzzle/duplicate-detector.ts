@@ -1,32 +1,40 @@
-import { PuzzleFingerprint, SimilarityResult, DuplicateCheckOptions } from './duplicate.types.js';
-import { PlacedWord } from './placement.types.js';
-import { GridUtils } from './grid-utils.js';
+import {
+  PuzzleFingerprint,
+  SimilarityResult,
+  DuplicateCheckOptions,
+} from "./duplicate.types.js";
+import { PlacedWord } from "./placement.types.js";
+import { GridUtils } from "./grid-utils";
 
 export class DuplicateDetector {
-  // Default similarity threshold (80% or higher = duplicate)
   private static readonly DEFAULT_THRESHOLD = 0.8;
 
-  /**
-   * Create a fingerprint for a puzzle
-   */
   static createFingerprint(
     grid: string[][],
     words: string[],
-    placedWords: PlacedWord[]
+    placedWords: PlacedWord[],
   ): PuzzleFingerprint {
-    // Sort words for consistent comparison
     const sortedWords = [...words].sort();
-    
-    // Create a string representation of word positions
+
     const positions = placedWords
       .map((pw) => {
-        return pw.word + ':' + pw.row + ',' + pw.col + ',' + pw.direction.dr + ',' + pw.direction.dc;
+        return (
+          pw.word +
+          ":" +
+          pw.row +
+          "," +
+          pw.col +
+          "," +
+          pw.direction.dr +
+          "," +
+          pw.direction.dc
+        );
       })
       .sort()
-      .join('|');
+      .join("|");
 
-    // Create a simple hash
-    const content = sortedWords.join('') + grid.length + grid[0].length + positions;
+    const content =
+      sortedWords.join("") + grid.length + grid[0].length + positions;
     const hash = this.simpleHash(content);
 
     return {
@@ -37,20 +45,21 @@ export class DuplicateDetector {
     };
   }
 
-  /**
-   * Compare two puzzles for similarity
-   */
   static comparePuzzles(
     fingerprint1: PuzzleFingerprint,
     fingerprint2: PuzzleFingerprint,
-    options: DuplicateCheckOptions = {}
+    options: DuplicateCheckOptions = {},
   ): SimilarityResult {
-    const { threshold = this.DEFAULT_THRESHOLD, compareGrid = true, compareWords = true, comparePositions = true } = options;
+    const {
+      threshold = this.DEFAULT_THRESHOLD,
+      compareGrid = true,
+      compareWords = true,
+      comparePositions = true,
+    } = options;
 
     let matchCount = 0;
     let totalChecks = 0;
 
-    // Compare grid size
     if (compareGrid) {
       totalChecks++;
       if (fingerprint1.gridSize === fingerprint2.gridSize) {
@@ -58,7 +67,6 @@ export class DuplicateDetector {
       }
     }
 
-    // Compare words
     if (compareWords) {
       totalChecks++;
       const words1 = new Set(fingerprint1.words);
@@ -75,7 +83,6 @@ export class DuplicateDetector {
       }
     }
 
-    // Compare positions
     if (comparePositions) {
       totalChecks++;
       if (fingerprint1.wordPositions === fingerprint2.wordPositions) {
@@ -83,39 +90,38 @@ export class DuplicateDetector {
       }
     }
 
-    // Calculate overall similarity
     const similarity = totalChecks > 0 ? matchCount / totalChecks : 0;
 
     return {
       score: similarity,
       isDuplicate: similarity >= threshold,
-      reason: similarity >= threshold ? 'Puzzle exceeds similarity threshold' : 'Puzzle is sufficiently different',
+      reason:
+        similarity >= threshold
+          ? "Puzzle exceeds similarity threshold"
+          : "Puzzle is sufficiently different",
     };
   }
 
-  /**
-   * Check if a new puzzle is a duplicate of existing puzzles
-   */
   static isDuplicate(
     newFingerprint: PuzzleFingerprint,
     existingFingerprints: PuzzleFingerprint[],
-    options: DuplicateCheckOptions = {}
+    options: DuplicateCheckOptions = {},
   ): SimilarityResult | null {
     if (existingFingerprints.length === 0) {
       return null;
     }
 
-    // Check if the hash matches exactly (fast path)
-    const exactMatch = existingFingerprints.find((f) => f.hash === newFingerprint.hash);
+    const exactMatch = existingFingerprints.find(
+      (f) => f.hash === newFingerprint.hash,
+    );
     if (exactMatch) {
       return {
         score: 1.0,
         isDuplicate: true,
-        reason: 'Exact match found',
+        reason: "Exact match found",
       };
     }
 
-    // Compare with each existing puzzle
     let highestSimilarity = 0;
     let mostSimilar: SimilarityResult | null = null;
 
@@ -130,32 +136,30 @@ export class DuplicateDetector {
     return mostSimilar;
   }
 
-  /**
-   * Simple hash function
-   */
   private static simpleHash(str: string): string {
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
       const char = str.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash = hash & hash; // Convert to 32-bit integer
+      hash = (hash << 5) - hash + char;
+      hash = hash & hash;
     }
     return hash.toString(16);
   }
 
-  /**
-   * Batch check for duplicates
-   */
   static findDuplicates(
     fingerprints: PuzzleFingerprint[],
-    options: DuplicateCheckOptions = {}
+    options: DuplicateCheckOptions = {},
   ): Map<number, number[]> {
     const duplicates = new Map<number, number[]>();
 
     for (let i = 0; i < fingerprints.length; i++) {
       const similarIndices: number[] = [];
       for (let j = i + 1; j < fingerprints.length; j++) {
-        const result = this.comparePuzzles(fingerprints[i], fingerprints[j], options);
+        const result = this.comparePuzzles(
+          fingerprints[i],
+          fingerprints[j],
+          options,
+        );
         if (result.isDuplicate) {
           similarIndices.push(j);
         }
@@ -168,29 +172,26 @@ export class DuplicateDetector {
     return duplicates;
   }
 
-  /**
-   * Get a summary of duplicate detection results
-   */
   static getDuplicateSummary(
     newFingerprint: PuzzleFingerprint,
-    existingFingerprints: PuzzleFingerprint[]
+    existingFingerprints: PuzzleFingerprint[],
   ): string {
     const result = this.isDuplicate(newFingerprint, existingFingerprints);
     if (!result) {
-      return 'No existing puzzles to compare against.';
+      return "No existing puzzles to compare against.";
     }
 
-    const status = result.isDuplicate ? 'DUPLICATE DETECTED' : 'UNIQUE';
+    const status = result.isDuplicate ? "DUPLICATE DETECTED" : "UNIQUE";
     const lines = [
-      'Duplicate Check Result: ' + status,
-      'Similarity Score: ' + (result.score * 100).toFixed(1) + '%',
-      'Threshold: ' + (this.DEFAULT_THRESHOLD * 100).toFixed(0) + '%',
+      "Duplicate Check Result: " + status,
+      "Similarity Score: " + (result.score * 100).toFixed(1) + "%",
+      "Threshold: " + (this.DEFAULT_THRESHOLD * 100).toFixed(0) + "%",
     ];
 
     if (result.reason) {
-      lines.push('Reason: ' + result.reason);
+      lines.push("Reason: " + result.reason);
     }
 
-    return lines.join('\n');
+    return lines.join("\n");
   }
 }

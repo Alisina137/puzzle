@@ -1,162 +1,274 @@
-﻿import { NextRequest } from "next/server";
+import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
-import {
-  apiResponse,
-  withApiHandler,
-  validateSchema,
-  bookIdSchema,
-  puzzleIdSchema,
-} from "@/lib";
+import { WordSelectionService } from "@/modules/theme/word-selection.service";
+import { GridGenerator } from "@/modules/puzzle/grid-generator";
+import { WordPlacer } from "@/modules/puzzle/word-placer";
+import { PuzzleValidator } from "@/modules/puzzle/puzzle-validator";
+import { DuplicateDetector } from "@/modules/puzzle/duplicate-detector";
+import { SolutionGenerator } from "@/modules/puzzle/solution-generator";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 
-// Helper to verify book ownership
-async function verifyBookOwnership(bookId: string, userId: string) {
-  const book = await prisma.book.findUnique({
-    where: { id: bookId },
-    select: { userId: true },
-  });
-
-  if (!book) {
-    return { error: apiResponse.notFound("Book not found") };
-  }
-
-  if (book.userId !== userId) {
-    return {
-      error: apiResponse.forbidden(
-        "You do not have permission to access this book",
-      ),
-    };
-  }
-
-  return { book };
-}
-
-// POST /api/books/[bookId]/puzzles/[puzzleId]/regenerate
-// Regenerate a puzzle
-async function regeneratePuzzle(
-  req: Request,
+export async function POST(
+  req: NextRequest,
   context: { params: { bookId: string; puzzleId: string } },
 ) {
-  const session = await getServerSession(authOptions);
+  try {
+    console.log("?? Regeneration started");
 
-  if (!session?.user?.id) {
-    return apiResponse.unauthorized("Please sign in");
-  }
+    const session = await getServerSession(authOptions);
 
-  const { bookId, puzzleId } = context.params;
+    if (!session?.user?.id) {
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
-  // Validate book ID
-  const bookValidation = validateSchema(bookIdSchema, { bookId });
+    const { bookId, puzzleId } = context.params;
+    console.log("?? Book ID:", bookId);
+    console.log("?? Puzzle ID:", puzzleId);
 
-  if (!bookValidation.success) {
-    return apiResponse.badRequest("Invalid book ID", bookValidation.errors);
-  }
+    // Get book details
+    const book = await prisma.book.findUnique({
+      where: { id: bookId },
+      select: { userId: true, theme: true },
+    });
 
-  // Validate puzzle ID
-  const puzzleValidation = validateSchema(puzzleIdSchema, {
-    puzzleId,
-  });
+    if (!book) {
+      return Response.json({ error: "Book not found" }, { status: 404 });
+    }
 
-  if (!puzzleValidation.success) {
-    return apiResponse.badRequest("Invalid puzzle ID", puzzleValidation.errors);
-  }
+    if (book.userId !== session.user.id) {
+      return Response.json({ error: "Forbidden" }, { status: 403 });
+    }
 
-  // Verify book ownership
-  const ownership = await verifyBookOwnership(bookId, session.user.id);
+    console.log("?? Book found, theme:", book.theme);
 
-  if (ownership.error) {
-    return ownership.error;
-  }
-
-  // Find the book puzzle
-  const bookPuzzle = await prisma.bookPuzzle.findFirst({
-    where: {
-      bookId,
-      id: puzzleId,
-    },
-    include: {
-      puzzle: true,
-      puzzleVersion: true,
-    },
-  });
-
-  if (!bookPuzzle) {
-    return apiResponse.notFound("Puzzle not found in this book");
-  }
-
-  // Get the current version number
-  const currentVersionNumber = bookPuzzle.puzzleVersion?.versionNumber || 0;
-
-  const newVersionNumber = currentVersionNumber + 1;
-
-  // TODO: Replace this placeholder with the actual
-  // puzzle generation engine.
-  const newPuzzleData = {
-    grid: Array(10)
-      .fill(null)
-      .map(() => Array(10).fill("B")),
-    words: ["REGENERATED", "PUZZLE", "BOOK"],
-    size: 10,
-    regeneratedAt: new Date().toISOString(),
-  };
-
-  // Update the main puzzle
-  const updatedPuzzle = await prisma.puzzle.update({
-    where: {
-      id: bookPuzzle.puzzleId,
-    },
-    data: {
-      data: newPuzzleData,
-      qualityScore: 90,
-    },
-  });
-
-  // Create the new puzzle version
-  const newVersion = await prisma.puzzleVersion.create({
-    data: {
-      puzzleId: bookPuzzle.puzzleId,
-      versionNumber: newVersionNumber,
-      data: newPuzzleData,
-      isActive: true,
-    },
-  });
-
-  // Deactivate all previous versions
-  await prisma.puzzleVersion.updateMany({
-    where: {
-      puzzleId: bookPuzzle.puzzleId,
-      isActive: true,
-      id: {
-        not: newVersion.id,
+    // Find the book puzzle
+    const bookPuzzle = await prisma.bookPuzzle.findFirst({
+      where: {
+        id: puzzleId,
+        bookId: bookId,
       },
-    },
-    data: {
-      isActive: false,
-    },
-  });
+      include: {
+        puzzle: {
+          include: {
+            versions: true,
+          },
+        },
+      },
+    });
 
-  // Update the book puzzle to use the new version
-  const updatedBookPuzzle = await prisma.bookPuzzle.update({
-    where: {
-      id: bookPuzzle.id,
-    },
-    data: {
-      puzzleVersionId: newVersion.id,
-    },
-    include: {
-      puzzle: true,
-      puzzleVersion: true,
-      solution: true,
-    },
-  });
+    if (!bookPuzzle) {
+      return Response.json(
+        { error: "Puzzle not found in this book" },
+        { status: 404 },
+      );
+    }
 
-  return apiResponse.success({
-    bookPuzzle: updatedBookPuzzle,
-    puzzle: updatedPuzzle,
-    message: "Puzzle regenerated successfully",
-    version: newVersionNumber,
-  });
+    console.log("?? Puzzle found");
+
+    // Get existing puzzles for duplicate check
+    const existingPuzzles = await prisma.bookPuzzle.findMany({
+      where: { bookId: bookId },
+      include: {
+        puzzle: {
+          include: {
+            versions: true,
+          },
+        },
+      },
+    });
+
+    const existingFingerprints = existingPuzzles.map((bp) => {
+      const activeVersion = bp.puzzle.versions.find((v) => v.isActive);
+      return DuplicateDetector.createFingerprint(
+        activeVersion?.data?.grid || [],
+        activeVersion?.data?.words || [],
+        activeVersion?.data?.placedWords || [],
+      );
+    });
+
+    let attempts = 0;
+    const maxAttempts = 10;
+    let newPuzzleData: any = null;
+    let newSolution: any = null;
+
+    while (attempts < maxAttempts) {
+      attempts++;
+
+      try {
+        console.log("?? Attempt", attempts);
+
+        const wordResult = WordSelectionService.selectWords({
+          theme: book.theme,
+          count: 12,
+          difficulty: "medium",
+        });
+
+        const words = wordResult.words;
+        const gridResult = GridGenerator.generate({ difficulty: "medium" });
+        const grid = gridResult.grid;
+        const placement = WordPlacer.placeWords(grid, words, {
+          maxAttempts: 10,
+        });
+
+        const validation = PuzzleValidator.validatePuzzle(
+          placement.grid,
+          words,
+          placement.placedWords,
+        );
+
+        if (!validation.valid) {
+          console.log("?? Validation failed");
+          continue;
+        }
+
+        const fingerprint = DuplicateDetector.createFingerprint(
+          placement.grid,
+          words,
+          placement.placedWords,
+        );
+
+        const duplicateCheck = DuplicateDetector.isDuplicate(
+          fingerprint,
+          existingFingerprints,
+        );
+
+        if (duplicateCheck && duplicateCheck.isDuplicate) {
+          console.log("?? Duplicate detected");
+          continue;
+        }
+
+        const solution = SolutionGenerator.generateSolution(
+          placement.grid,
+          placement.placedWords,
+        );
+
+        const verification = SolutionGenerator.verifySolution(
+          solution,
+          placement.grid,
+          words,
+        );
+
+        if (!verification.valid) {
+          console.log("?? Solution invalid");
+          continue;
+        }
+
+        newPuzzleData = {
+          grid: placement.grid,
+          words: words,
+          placedWords: placement.placedWords,
+          size: placement.grid.length,
+        };
+
+        newSolution = solution;
+        console.log("? New puzzle generated on attempt", attempts);
+        break;
+      } catch (error) {
+        console.error("? Attempt", attempts, "failed:", error);
+        continue;
+      }
+    }
+
+    if (!newPuzzleData) {
+      return Response.json(
+        {
+          error:
+            "Failed to generate a valid replacement puzzle after " +
+            maxAttempts +
+            " attempts",
+        },
+        { status: 500 },
+      );
+    }
+
+    // Update the puzzle
+    const updatedPuzzle = await prisma.puzzle.update({
+      where: { id: bookPuzzle.puzzleId },
+      data: {
+        data: newPuzzleData,
+        difficulty: "medium",
+        qualityScore: 85,
+      },
+    });
+
+    console.log("? Puzzle updated");
+
+    // Create new version
+    const currentVersion = await prisma.puzzleVersion.findFirst({
+      where: { puzzleId: bookPuzzle.puzzleId },
+      orderBy: { versionNumber: "desc" },
+    });
+
+    const newVersionNumber = (currentVersion?.versionNumber || 0) + 1;
+
+    const newPuzzleVersion = await prisma.puzzleVersion.create({
+      data: {
+        puzzleId: updatedPuzzle.id,
+        versionNumber: newVersionNumber,
+        data: newPuzzleData,
+        isActive: true,
+      },
+    });
+
+    console.log("? Version created:", newVersionNumber);
+
+    // Deactivate old versions
+    await prisma.puzzleVersion.updateMany({
+      where: {
+        puzzleId: updatedPuzzle.id,
+        isActive: true,
+        id: {
+          not: newPuzzleVersion.id,
+        },
+      },
+      data: {
+        isActive: false,
+      },
+    });
+
+    // Update book puzzle
+    const updatedBookPuzzle = await prisma.bookPuzzle.update({
+      where: { id: bookPuzzle.id },
+      data: {
+        puzzleVersionId: newPuzzleVersion.id,
+      },
+      include: {
+        puzzle: true,
+        puzzleVersion: true,
+        solution: true,
+      },
+    });
+
+    // Update solution
+    await prisma.solution.update({
+      where: { bookPuzzleId: bookPuzzle.id },
+      data: {
+        data: {
+          grid: newSolution.grid,
+          words: newSolution.words,
+        },
+        validatedAt: new Date(),
+        isValid: true,
+      },
+    });
+
+    console.log("? Regeneration complete");
+
+    return Response.json({
+      success: true,
+      data: {
+        bookPuzzle: updatedBookPuzzle,
+        message: "Puzzle regenerated successfully",
+        version: newVersionNumber,
+        attempts: attempts,
+      },
+    });
+  } catch (error: any) {
+    console.error("? Regeneration error:", error);
+    return Response.json(
+      { error: error.message || "Failed to regenerate puzzle" },
+      { status: 500 },
+    );
+  }
 }
-
-export const POST = withApiHandler(regeneratePuzzle);

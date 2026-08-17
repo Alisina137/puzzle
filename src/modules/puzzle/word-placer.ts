@@ -1,34 +1,39 @@
-import { PlacedWord, Direction, PlacementResult, PlacementOptions } from './placement.types.js';
-import { GridUtils } from './grid-utils.js';
+import {
+  PlacedWord,
+  Direction,
+  PlacementResult,
+  PlacementOptions,
+} from "./placement.types";
+import { GridUtils } from "./grid-utils";
 
 export class WordPlacer {
   // All 8 directions
   private static readonly DIRECTIONS: Direction[] = [
-    { dr: 0, dc: 1, name: 'right' },
-    { dr: 0, dc: -1, name: 'left' },
-    { dr: 1, dc: 0, name: 'down' },
-    { dr: -1, dc: 0, name: 'up' },
-    { dr: 1, dc: 1, name: 'down-right' },
-    { dr: -1, dc: -1, name: 'up-left' },
-    { dr: 1, dc: -1, name: 'down-left' },
-    { dr: -1, dc: 1, name: 'up-right' },
+    { dr: 0, dc: 1, name: "right" },
+    { dr: 0, dc: -1, name: "left" },
+    { dr: 1, dc: 0, name: "down" },
+    { dr: -1, dc: 0, name: "up" },
+    { dr: 1, dc: 1, name: "down-right" },
+    { dr: -1, dc: -1, name: "up-left" },
+    { dr: 1, dc: -1, name: "down-left" },
+    { dr: -1, dc: 1, name: "up-right" },
   ];
 
   // Direction groups for better distribution
   private static readonly DIRECTION_GROUPS = {
     horizontal: [
-      { dr: 0, dc: 1, name: 'right' },
-      { dr: 0, dc: -1, name: 'left' },
+      { dr: 0, dc: 1, name: "right" },
+      { dr: 0, dc: -1, name: "left" },
     ],
     vertical: [
-      { dr: 1, dc: 0, name: 'down' },
-      { dr: -1, dc: 0, name: 'up' },
+      { dr: 1, dc: 0, name: "down" },
+      { dr: -1, dc: 0, name: "up" },
     ],
     diagonal: [
-      { dr: 1, dc: 1, name: 'down-right' },
-      { dr: -1, dc: -1, name: 'up-left' },
-      { dr: 1, dc: -1, name: 'down-left' },
-      { dr: -1, dc: 1, name: 'up-right' },
+      { dr: 1, dc: 1, name: "down-right" },
+      { dr: -1, dc: -1, name: "up-left" },
+      { dr: 1, dc: -1, name: "down-left" },
+      { dr: -1, dc: 1, name: "up-right" },
     ],
   };
 
@@ -38,9 +43,13 @@ export class WordPlacer {
   static placeWords(
     grid: string[][],
     words: string[],
-    options: PlacementOptions = {}
+    options: PlacementOptions = {},
   ): PlacementResult {
-    const { maxAttempts = 100, allowBackwards = true, randomizeDirection = true } = options;
+    const {
+      maxAttempts = 100,
+      allowBackwards = true,
+      randomizeDirection = true,
+    } = options;
 
     const placedWords: PlacedWord[] = [];
     const failedWords: string[] = [];
@@ -59,7 +68,11 @@ export class WordPlacer {
         totalAttempts++;
 
         // Get available directions
-        let directions = this.getAvailableDirections(workingGrid, word, allowBackwards);
+        let directions = this.getAvailableDirections(
+          workingGrid,
+          word,
+          allowBackwards,
+        );
 
         // Shuffle directions for randomness
         if (randomizeDirection) {
@@ -67,13 +80,19 @@ export class WordPlacer {
         }
 
         for (const direction of directions) {
-          const positions = this.findValidPositions(workingGrid, word, direction);
-          
+          const positions = this.findValidPositions(
+            workingGrid,
+            word,
+            direction,
+          );
+
           // Shuffle positions for randomness
           const shuffledPositions = this.shuffleArray(positions);
-          
+
           for (const pos of shuffledPositions) {
-            if (this.canPlaceWord(workingGrid, word, pos.row, pos.col, direction)) {
+            if (
+              this.canPlaceWord(workingGrid, word, pos.row, pos.col, direction)
+            ) {
               // Place the word
               this.placeWord(workingGrid, word, pos.row, pos.col, direction);
               placedWords.push({
@@ -112,14 +131,14 @@ export class WordPlacer {
   private static getAvailableDirections(
     grid: string[][],
     word: string,
-    allowBackwards: boolean
+    allowBackwards: boolean,
   ): Direction[] {
     let directions = [...this.DIRECTIONS];
 
     // If backwards is not allowed, remove left, up, and diagonal opposites
     if (!allowBackwards) {
       directions = directions.filter(
-        (d) => !(d.dr < 0 || d.dc < 0 || (d.dr < 0 && d.dc < 0))
+        (d) => !(d.dr < 0 || d.dc < 0 || (d.dr < 0 && d.dc < 0)),
       );
     }
 
@@ -129,13 +148,13 @@ export class WordPlacer {
       const maxCol = grid[0].length - 1;
       const endRow = d.dr * (word.length - 1);
       const endCol = d.dc * (word.length - 1);
-      
+
       // Check if word fits in grid
       if (d.dr > 0 && endRow > maxRow) return false;
       if (d.dr < 0 && endRow < 0) return false;
       if (d.dc > 0 && endCol > maxCol) return false;
       if (d.dc < 0 && endCol < 0) return false;
-      
+
       return true;
     });
 
@@ -148,7 +167,7 @@ export class WordPlacer {
   private static findValidPositions(
     grid: string[][],
     word: string,
-    direction: Direction
+    direction: Direction,
   ): { row: number; col: number }[] {
     const positions: { row: number; col: number }[] = [];
     const rows = grid.length;
@@ -183,7 +202,7 @@ export class WordPlacer {
     word: string,
     row: number,
     col: number,
-    direction: Direction
+    direction: Direction,
   ): boolean {
     const wordLen = word.length;
 
@@ -193,7 +212,7 @@ export class WordPlacer {
       const cell = grid[r][c];
 
       // Cell must be empty or match the letter
-      if (cell !== '' && cell !== word[i]) {
+      if (cell !== "" && cell !== word[i]) {
         return false;
       }
     }
@@ -209,7 +228,7 @@ export class WordPlacer {
     word: string,
     row: number,
     col: number,
-    direction: Direction
+    direction: Direction,
   ): void {
     const wordLen = word.length;
 
@@ -224,11 +243,13 @@ export class WordPlacer {
    * Fill empty cells with random letters
    */
   private static fillEmptyCells(grid: string[][]): void {
-    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
     for (let i = 0; i < grid.length; i++) {
       for (let j = 0; j < grid[i].length; j++) {
-        if (grid[i][j] === '') {
-          grid[i][j] = letters.charAt(Math.floor(Math.random() * letters.length));
+        if (grid[i][j] === "") {
+          grid[i][j] = letters.charAt(
+            Math.floor(Math.random() * letters.length),
+          );
         }
       }
     }

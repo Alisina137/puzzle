@@ -11,16 +11,10 @@ export interface GridBounds {
 }
 
 export class GridUtils {
-  /**
-   * Check if a position is within grid bounds
-   */
   static isValidPosition(grid: string[][], row: number, col: number): boolean {
     return row >= 0 && row < grid.length && col >= 0 && col < grid[row].length;
   }
 
-  /**
-   * Get the dimensions of a grid
-   */
   static getDimensions(grid: string[][]): { rows: number; cols: number } {
     return {
       rows: grid.length,
@@ -28,31 +22,12 @@ export class GridUtils {
     };
   }
 
-  /**
-   * Create a deep copy of a grid
-   */
-  static copyGrid(grid: string[][]): string[][] {
-    return grid.map((row) => [...row]);
-  }
-
-  /**
-   * Get all neighboring positions
-   */
-  static getNeighbors(
-    grid: string[][],
-    row: number,
-    col: number,
-  ): GridPosition[] {
+  static getNeighbors(grid: string[][], row: number, col: number): GridPosition[] {
     const neighbors: GridPosition[] = [];
     const directions = [
-      [-1, -1],
-      [-1, 0],
-      [-1, 1],
-      [0, -1],
-      [0, 1],
-      [1, -1],
-      [1, 0],
-      [1, 1],
+      [-1, -1], [-1, 0], [-1, 1],
+      [0, -1],           [0, 1],
+      [1, -1],  [1, 0],  [1, 1],
     ];
 
     for (const [dr, dc] of directions) {
@@ -66,16 +41,7 @@ export class GridUtils {
     return neighbors;
   }
 
-  /**
-   * Get a subgrid
-   */
-  static getSubgrid(
-    grid: string[][],
-    startRow: number,
-    startCol: number,
-    rows: number,
-    cols: number,
-  ): string[][] {
+  static getSubgrid(grid: string[][], startRow: number, startCol: number, rows: number, cols: number): string[][] {
     const subgrid: string[][] = [];
     for (let i = startRow; i < startRow + rows && i < grid.length; i++) {
       const row: string[] = [];
@@ -87,24 +53,15 @@ export class GridUtils {
     return subgrid;
   }
 
-  /**
-   * Check if a grid is empty
-   */
   static isEmpty(grid: string[][]): boolean {
     return grid.length === 0 || grid[0].length === 0;
   }
 
-  /**
-   * Check if a grid is square
-   */
   static isSquare(grid: string[][]): boolean {
     if (this.isEmpty(grid)) return false;
     return grid.length === grid[0].length;
   }
 
-  /**
-   * Get the bounds of non-empty cells
-   */
   static getNonEmptyBounds(grid: string[][]): GridBounds | null {
     let minRow = Infinity;
     let maxRow = -Infinity;
@@ -114,7 +71,7 @@ export class GridUtils {
 
     for (let i = 0; i < grid.length; i++) {
       for (let j = 0; j < grid[i].length; j++) {
-        if (grid[i][j] !== "" && grid[i][j] !== null) {
+        if (grid[i][j] !== '' && grid[i][j] !== null) {
           hasContent = true;
           minRow = Math.min(minRow, i);
           maxRow = Math.max(maxRow, i);
@@ -131,16 +88,10 @@ export class GridUtils {
     return { minRow, maxRow, minCol, maxCol };
   }
 
-  /**
-   * Convert grid to string for display
-   */
   static gridToString(grid: string[][]): string {
-    return grid.map((row) => row.join(" ")).join("\n");
+    return grid.map(row => row.join(' ')).join('\n');
   }
 
-  /**
-   * Get a specific row
-   */
   static getRow(grid: string[][], rowIndex: number): string[] {
     if (rowIndex < 0 || rowIndex >= grid.length) {
       return [];
@@ -148,9 +99,6 @@ export class GridUtils {
     return [...grid[rowIndex]];
   }
 
-  /**
-   * Get a specific column
-   */
   static getColumn(grid: string[][], colIndex: number): string[] {
     const col: string[] = [];
     for (let i = 0; i < grid.length; i++) {
@@ -161,12 +109,12 @@ export class GridUtils {
     return col;
   }
 
-  /**
-   * Get the average word length capacity of the grid
-   */
   static getWordCapacity(grid: string[][]): number {
     const { rows, cols } = this.getDimensions(grid);
-    // Estimate: each word takes about 3-4 cells on average
     return Math.floor((rows * cols) / 4);
+  }
+
+  static copyGrid(grid: string[][]): string[][] {
+    return grid.map(row => [...row]);
   }
 }

@@ -4,7 +4,7 @@ import { travelWords } from './travel';
 import { foodWords } from './food';
 import { sportsWords } from './sports';
 
-export const themeWordLists = {
+export const THEME_WORDS = {
   animals: animalsWords,
   space: spaceWords,
   travel: travelWords,
@@ -12,7 +12,7 @@ export const themeWordLists = {
   sports: sportsWords,
 };
 
-export type ThemeKey = keyof typeof themeWordLists;
+export type ThemeKey = keyof typeof THEME_WORDS;
 
 export const themeLabels: Record<ThemeKey, string> = {
   animals: 'Animals',
@@ -38,22 +38,18 @@ export const themeWordCounts: Record<ThemeKey, number> = {
   sports: sportsWords.length,
 };
 
-// Get all available theme keys
 export function getThemeKeys(): ThemeKey[] {
-  return Object.keys(themeWordLists) as ThemeKey[];
+  return Object.keys(THEME_WORDS) as ThemeKey[];
 }
 
-// Check if a theme is valid
 export function isValidTheme(theme: string): theme is ThemeKey {
-  return theme in themeWordLists;
+  return theme in THEME_WORDS;
 }
 
-// Get words for a specific theme
 export function getThemeWords(theme: ThemeKey): string[] {
-  return themeWordLists[theme] || [];
+  return THEME_WORDS[theme] || [];
 }
 
-// Get a random subset of words from a theme
 export function getRandomWords(
   theme: ThemeKey,
   count: number = 10,
@@ -62,7 +58,6 @@ export function getRandomWords(
   const allWords = getThemeWords(theme);
   const available = allWords.filter((word) => !exclude.includes(word));
   
-  // Shuffle and select
   const shuffled = [...available].sort(() => Math.random() - 0.5);
   return shuffled.slice(0, Math.min(count, shuffled.length));
 }
