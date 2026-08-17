@@ -1,14 +1,38 @@
-﻿"use client";
+﻿'use client';
 
-import { useParams } from "next/navigation";
-import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { useEffect, useState } from "react";
-import { Loader2, ArrowLeft, RefreshCw } from "lucide-react";
-import Link from "next/link";
-import { GenerationProgress } from "@/components/generation/GenerationProgress";
+import { useParams } from 'next/navigation';
+import { DashboardLayout } from '@/components/layout/DashboardLayout';
+import { useEffect, useState } from 'react';
+import { Loader2, ArrowLeft, RefreshCw } from 'lucide-react';
+import Link from 'next/link';
+import { GenerationProgress } from '@/components/generation/GenerationProgress';
+import { PuzzleList } from '@/components/puzzle/PuzzleList';
 
 interface BookPuzzle {
   id: string;
+  position: number;
+  displayNumber: number;
+  puzzleId: string;
+  puzzleVersionId: string;
+  puzzle?: {
+    id: string;
+    type: string;
+    data: unknown;
+    difficulty: string | null;
+    qualityScore: number | null;
+  };
+  puzzleVersion?: {
+    id: string;
+    versionNumber: number;
+    data: unknown;
+    isActive: boolean;
+  };
+  solution?: {
+    id: string;
+    data: unknown;
+    validatedAt: string | null;
+    isValid: boolean | null;
+  } | null;
 }
 
 interface Book {
@@ -33,7 +57,7 @@ export default function BookPage() {
 
   useEffect(() => {
     if (!bookId) {
-      setError("No book ID provided");
+      setError('No book ID provided');
       setLoading(false);
       return;
     }
@@ -45,24 +69,44 @@ export default function BookPage() {
         setLoading(true);
         setError(null);
 
-        const response = await fetch("/api/books/" + bookId, {
-          cache: "no-store",
+        const response = await fetch('/api/books/' + bookId, {
+          cache: 'no-store',
         });
 
         if (response.status === 401) {
-          window.location.href = "/login";
+          window.location.href = '/login';
           return;
         }
 
         if (response.status === 404) {
           if (isMounted) {
-            setError("Book not found");
+            setError('Book not found');
+            setBook(null);
+          }
+          return;
+        }
+
+        if (response.status === 403) {
+          if (isMounted) {
+            setError('You do not have permission to view this book.');
+            setBook(null);
           }
           return;
         }
 
         if (!response.ok) {
-          throw new Error("Failed to fetch book");
+          let message = 'Failed to fetch book';
+
+          try {
+            const errorResult = await response.json();
+            if (errorResult?.error) {
+              message = errorResult.error;
+            }
+          } catch {
+            // Ignore JSON parsing errors
+          }
+
+          throw new Error(message);
         }
 
         const result = await response.json();
@@ -71,7 +115,11 @@ export default function BookPage() {
           return;
         }
 
-        console.log("Book data:", result);
+        if (!result?.data) {
+          throw new Error('Invalid book data received from server');
+        }
+
+        console.log('Book data:', result.data);
 
         setBook(result.data);
         setError(null);
@@ -80,12 +128,14 @@ export default function BookPage() {
           return;
         }
 
-        console.error("Error fetching book:", err);
+        console.error('Error fetching book:', err);
 
-        const message =
-          err instanceof Error ? err.message : "Failed to load book";
+        setError(
+          err instanceof Error
+            ? err.message
+            : 'Failed to load book'
+        );
 
-        setError(message);
         setBook(null);
       } finally {
         if (isMounted) {
@@ -110,28 +160,31 @@ export default function BookPage() {
   };
 
   const handleGenerationError = (errorMessage: string) => {
-    console.error("Generation error:", errorMessage);
+    console.error('Generation error:', errorMessage);
     refreshBook();
   };
 
   const getStatusBadge = (status: string) => {
     const styles: Record<string, string> = {
-      pending: "bg-gray-100 text-gray-600",
-      generating: "bg-yellow-100 text-yellow-700",
-      ready: "bg-green-100 text-green-700",
-      exporting: "bg-purple-100 text-purple-700",
-      exported: "bg-blue-100 text-blue-700",
-      failed: "bg-red-100 text-red-700",
+      pending: 'bg-gray-100 text-gray-600',
+      generating: 'bg-yellow-100 text-yellow-700',
+      ready: 'bg-green-100 text-green-700',
+      exporting: 'bg-purple-100 text-purple-700',
+      exported: 'bg-blue-100 text-blue-700',
+      failed: 'bg-red-100 text-red-700',
     };
 
-    return styles[status] || "bg-gray-100 text-gray-600";
+    return styles[status] || 'bg-gray-100 text-gray-600';
   };
 
   if (loading) {
     return (
       <DashboardLayout>
         <div className="flex items-center justify-center h-64">
-          <Loader2 size={32} className="animate-spin text-blue-600" />
+          <Loader2
+            size={32}
+            className="animate-spin text-blue-600"
+          />
         </div>
       </DashboardLayout>
     );
@@ -141,7 +194,9 @@ export default function BookPage() {
     return (
       <DashboardLayout>
         <div className="text-center py-12">
-          <p className="text-red-500">{error || "Book not found"}</p>
+          <p className="text-red-500">
+            {error || 'Book not found'}
+          </p>
 
           <div className="mt-4 flex items-center justify-center gap-4">
             <button
@@ -152,8 +207,11 @@ export default function BookPage() {
               Retry
             </button>
 
-            <Link href="/books" className="text-blue-600 hover:underline">
-              <span aria-hidden="true">←</span> Back to Books
+            <Link
+              href="/books"
+              className="text-blue-600 hover:underline"
+            >
+              ← Back to Books
             </Link>
           </div>
         </div>
@@ -161,12 +219,12 @@ export default function BookPage() {
     );
   }
 
-  const generatedCount = book.bookPuzzles?.length ?? 0;
+  const generatedCount = book.bookPuzzles?.length || 0;
 
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Back Navigation */}
+
         <Link
           href="/books"
           className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-800"
@@ -175,19 +233,22 @@ export default function BookPage() {
           Back to Books
         </Link>
 
-        {/* Book Header */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-gray-800">{book.title}</h1>
+              <h1 className="text-2xl font-bold text-gray-800">
+                {book.title}
+              </h1>
 
-              <p className="text-gray-500">Theme: {book.theme}</p>
+              <p className="text-gray-500">
+                Theme: {book.theme}
+              </p>
             </div>
 
             <div className="flex items-center gap-3">
               <span
                 className={
-                  "px-3 py-1 text-sm rounded-full " +
+                  'px-3 py-1 text-sm rounded-full ' +
                   getStatusBadge(book.status)
                 }
               >
@@ -206,43 +267,51 @@ export default function BookPage() {
             </div>
           </div>
 
-          {/* Book Statistics */}
           <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
+
             <div className="bg-gray-50 rounded-lg p-4 text-center">
               <p className="text-2xl font-bold text-gray-800">
                 {book.puzzleCount}
               </p>
-              <p className="text-sm text-gray-500">Total Puzzles</p>
+              <p className="text-sm text-gray-500">
+                Total Puzzles
+              </p>
             </div>
 
             <div className="bg-gray-50 rounded-lg p-4 text-center">
               <p className="text-2xl font-bold text-gray-800">
                 {generatedCount}
               </p>
-              <p className="text-sm text-gray-500">Generated</p>
+              <p className="text-sm text-gray-500">
+                Generated
+              </p>
             </div>
 
             <div className="bg-gray-50 rounded-lg p-4 text-center">
               <p className="text-2xl font-bold text-gray-800">
-                {book.qualityScore ?? "N/A"}
+                {book.qualityScore ?? 'N/A'}
               </p>
-              <p className="text-sm text-gray-500">Quality Score</p>
+              <p className="text-sm text-gray-500">
+                Quality Score
+              </p>
             </div>
 
             <div className="bg-gray-50 rounded-lg p-4 text-center">
-              <p className="text-sm text-gray-500">Created</p>
+              <p className="text-sm text-gray-500">
+                Created
+              </p>
 
               <p className="text-sm font-medium text-gray-700">
                 {new Date(book.createdAt).toLocaleDateString()}
               </p>
             </div>
+
           </div>
         </div>
 
-        {/* Generation Progress */}
-        {(book.status === "pending" ||
-          book.status === "generating" ||
-          book.status === "failed") && (
+        {(book.status === 'pending' ||
+          book.status === 'generating' ||
+          book.status === 'failed') && (
           <GenerationProgress
             bookId={book.id}
             onComplete={handleGenerationComplete}
@@ -250,43 +319,25 @@ export default function BookPage() {
           />
         )}
 
-        {/* Puzzles Section */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <h2 className="text-lg font-semibold text-gray-800 mb-4">Puzzles</h2>
 
-          {generatedCount > 0 ? (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {book.bookPuzzles.map((bp, index) => (
-                <div
-                  key={bp.id}
-                  className="bg-gray-50 rounded-lg p-3 text-center border border-gray-100"
-                >
-                  <p className="text-sm font-medium text-gray-700">
-                    #{index + 1}
-                  </p>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-800">
+              Puzzles
+            </h2>
 
-                  <p className="text-xs text-gray-400">Puzzle {index + 1}</p>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-12 text-gray-500">
-              <p>No puzzles generated yet</p>
+            <span className="text-sm text-gray-400">
+              {generatedCount} of {book.puzzleCount} generated
+            </span>
+          </div>
 
-              <p className="text-sm mt-1">
-                {book.status === "pending"
-                  ? "Generation is queued..."
-                  : book.status === "generating"
-                    ? "Generation is in progress..."
-                    : book.status === "ready"
-                      ? "Puzzles should be here. Try refreshing."
-                      : book.status === "failed"
-                        ? "Generation failed. Check the progress section above."
-                        : "Puzzles will appear here when generation is complete."}
-              </p>
-            </div>
-          )}
+          <PuzzleList
+            puzzles={book.bookPuzzles || []}
+            bookId={book.id}
+          />
+
         </div>
+
       </div>
     </DashboardLayout>
   );
