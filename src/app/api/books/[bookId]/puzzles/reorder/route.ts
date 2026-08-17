@@ -1,134 +1,189 @@
-﻿import { prisma } from "@/lib/prisma";
-import {
-  apiResponse,
-  withApiHandler,
-  validateSchema,
-  bookIdSchema,
-  reorderPuzzlesSchema,
-} from "@/lib";
+import { NextRequest } from "next/server";
+import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 
-// Helper to verify book ownership
-async function verifyBookOwnership(bookId: string, userId: string) {
-  const book = await prisma.book.findUnique({
-    where: { id: bookId },
-    select: { userId: true },
-  });
-
-  if (!book) {
-    return {
-      error: apiResponse.notFound("Book not found"),
-    };
-  }
-
-  if (book.userId !== userId) {
-    return {
-      error: apiResponse.forbidden(
-        "You do not have permission to access this book",
-      ),
-    };
-  }
-
-  return { book };
-}
-
-// PATCH /api/books/[bookId]/puzzles/reorder
-// Reorder puzzles in a book
-async function reorderPuzzles(
-  req: Request,
+export async function PATCH(
+  req: NextRequest,
   context: { params: { bookId: string } },
 ) {
-  const session = await getServerSession(authOptions);
+  try {
+    const session = await getServerSession(authOptions);
 
-  if (!session?.user?.id) {
-    return apiResponse.unauthorized("Please sign in");
-  }
+    if (!session?.user?.id) {
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
-  const { bookId } = context.params;
-  const body = await req.json();
+    const { bookId } = context.params;
 
-  // Validate book ID
-  const bookValidation = validateSchema(bookIdSchema, { bookId });
+    if (!bookId) {
+      return Response.json({ error: "Book ID is required" }, { status: 400 });
+    }
 
-  if (!bookValidation.success) {
-    return apiResponse.badRequest("Invalid book ID", bookValidation.errors);
-  }
+    const body = await req.json();
+    const { order } = body;
 
-  // Validate reorder data
-  const validation = validateSchema(reorderPuzzlesSchema, body);
+    if (!Array.isArray(order) || order.length === 0) {
+      return Response.json(
+        { error: "Valid order array is required" },
+        { status: 400 },
+      );
+    }
 
-  if (!validation.success) {
-    return apiResponse.badRequest("Validation failed", validation.errors);
-  }
+    // Prevent duplicate IDs in the submitted order
+    const uniqueOrder = new Set(order);
 
-  // Verify book ownership
-  const ownership = await verifyBookOwnership(bookId, session.user.id);
+    if (uniqueOrder.size !== order.length) {
+      return Response.json(
+        { error: "Order contains duplicate puzzle IDs" },
+        { status: 400 },
+      );
+    }
 
-  if (ownership.error) {
-    return ownership.error;
-  }
-
-  const { order } = validation.data;
-
-  // Verify all puzzles belong to the book
-  const existingPuzzles = await prisma.bookPuzzle.findMany({
-    where: {
-      bookId,
-      id: {
-        in: order,
-      },
-    },
-    select: {
-      id: true,
-    },
-  });
-
-  const existingIds = existingPuzzles.map((puzzle) => puzzle.id);
-
-  const missingIds = order.filter((id) => !existingIds.includes(id));
-
-  if (missingIds.length > 0) {
-    return apiResponse.badRequest("Some puzzles do not belong to this book", {
-      missingIds,
+    // Verify book ownership
+    const book = await prisma.book.findUnique({
+      where: { id: bookId },
+      select: { userId: true },
     });
-  }
 
-  // Update positions in a transaction
-  // Correct - using $transaction
-  await prisma.$transaction(
-    order.map((puzzleId, index) =>
-      prisma.bookPuzzle.update({
+    if (!book) {
+      return Response.json({ error: "Book not found" }, { status: 404 });
+    }
+
+    if (book.userId !== session.user.id) {
+      return Response.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    // Get ALL puzzles belonging to this book
+    const existingPuzzles = await prisma.bookPuzzle.findMany({
+      where: { bookId },
+      select: {
+        id: true,
+        position: true,
+      },
+      orderBy: {
+        position: "asc",
+      },
+    });
+
+    // The frontend must send the complete order
+    if (order.length !== existingPuzzles.length) {
+      return Response.json(
+        {
+          error: "The order must contain every puzzle in the book",
+          expected: existingPuzzles.length,
+          received: order.length,
+        },
+        { status: 400 },
+      );
+    }
+
+    const existingIds = new Set(existingPuzzles.map((puzzle) => puzzle.id));
+
+    const invalidIds = order.filter((id: string) => !existingIds.has(id));
+
+    if (invalidIds.length > 0) {
+      return Response.json(
+        {
+          error: "Some puzzles do not belong to this book",
+          invalidIds,
+        },
+        { status: 400 },
+      );
+    }
+
+    /*
+     * IMPORTANT:
+     *
+     * The database has a unique constraint:
+     *
+     *   (bookId, position)
+     *
+     * Therefore we cannot directly change:
+     *
+     *   A: 0 -> 1
+     *   B: 1 -> 0
+     *
+     * because the first update would temporarily create:
+     *
+     *   A: 1
+     *   B: 1
+     *
+     * Instead:
+     *
+     *   Step 1: move everything to temporary positions
+     *   Step 2: assign the final positions
+     */
+
+    const updatedPuzzles = await prisma.$transaction(async (tx) => {
+      // Step 1: Move every puzzle to a unique temporary position.
+      //
+      // Negative positions are safe because normal positions
+      // start at 0.
+      for (let i = 0; i < existingPuzzles.length; i++) {
+        await tx.bookPuzzle.update({
+          where: {
+            id: existingPuzzles[i].id,
+          },
+          data: {
+            position: -(i + 1),
+          },
+        });
+      }
+
+      // Step 2: Assign final positions.
+      for (let i = 0; i < order.length; i++) {
+        await tx.bookPuzzle.update({
+          where: {
+            id: order[i],
+          },
+          data: {
+            position: i,
+            displayNumber: i + 1,
+          },
+        });
+      }
+
+      // Return the final order
+      return tx.bookPuzzle.findMany({
         where: {
-          id: puzzleId,
+          bookId,
         },
-        data: {
-          position: index,
-          displayNumber: index + 1,
+        include: {
+          puzzle: true,
+          puzzleVersion: true,
+          solution: true,
         },
-      }),
-    ),
-  );
+        orderBy: {
+          position: "asc",
+        },
+      });
+    });
 
-  // Get the updated book puzzles
-  const updatedPuzzles = await prisma.bookPuzzle.findMany({
-    where: {
-      bookId,
-    },
-    include: {
-      puzzle: true,
-      puzzleVersion: true,
-      solution: true,
-    },
-    orderBy: {
-      position: "asc",
-    },
-  });
+    return Response.json({
+      success: true,
+      data: {
+        puzzles: updatedPuzzles,
+        message: "Puzzles reordered successfully",
+      },
+    });
+  } catch (error: any) {
+    console.error("Reorder error:", error);
 
-  return apiResponse.success({
-    puzzles: updatedPuzzles,
-    message: "Puzzles reordered successfully",
-  });
+    if (error.code === "P2002") {
+      return Response.json(
+        {
+          error: "Conflict: Duplicate position. Please try again.",
+        },
+        { status: 409 },
+      );
+    }
+
+    return Response.json(
+      {
+        error: error.message || "Failed to reorder puzzles",
+      },
+      { status: 500 },
+    );
+  }
 }
-
-export const PATCH = withApiHandler(reorderPuzzles);
