@@ -1,10 +1,11 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { apiResponse } from "./api-response";
 import { Prisma } from "@prisma/client";
 
 export type ApiHandler<
   P extends Record<string, string> = Record<string, string>,
-> = (req: Request, context: { params: P }) => Promise<NextResponse>;
+  T extends NextResponse = NextResponse,
+> = (req: NextRequest, context: { params: P }) => Promise<T>;
 
 export function handleApiError(error: unknown): NextResponse {
   console.error("API Error:", error);
@@ -41,28 +42,33 @@ export function handleApiError(error: unknown): NextResponse {
 
 export function withApiHandler<
   P extends Record<string, string> = Record<string, string>,
+  T extends NextResponse = NextResponse,
 >(
-  handler: ApiHandler<P>,
-): (req: Request, context: { params: P }) => Promise<NextResponse> {
-  return async (req: Request, context: { params: P }) => {
+  handler: ApiHandler<P, T>,
+): (req: NextRequest, context: { params: P }) => Promise<T> {
+  return async (req: NextRequest, context: { params: P }): Promise<T> => {
     try {
       return await handler(req, context);
     } catch (error) {
-      return handleApiError(error);
+      return handleApiError(error) as T;
     }
   };
 }
 
+// Helper for authenticated routes.
+// Authentication is handled by getServerSession(authOptions)
+// inside the actual route handlers.
 export function withAuth<
   P extends Record<string, string> = Record<string, string>,
+  T extends NextResponse = NextResponse,
 >(
-  handler: ApiHandler<P>,
-): (req: Request, context: { params: P }) => Promise<NextResponse> {
-  return async (req: Request, context: { params: P }) => {
+  handler: ApiHandler<P, T>,
+): (req: NextRequest, context: { params: P }) => Promise<T> {
+  return async (req: NextRequest, context: { params: P }): Promise<T> => {
     try {
       return await handler(req, context);
     } catch (error) {
-      return handleApiError(error);
+      return handleApiError(error) as T;
     }
   };
 }
