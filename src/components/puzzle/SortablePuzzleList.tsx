@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import { useState } from "react";
+import { useState } from 'react';
 import {
   DndContext,
   closestCenter,
@@ -9,16 +9,16 @@ import {
   useSensor,
   useSensors,
   DragEndEvent,
-} from "@dnd-kit/core";
+} from '@dnd-kit/core';
 import {
   arrayMove,
   SortableContext,
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
-import { PuzzleCard } from "./PuzzleCard";
-import { Loader2 } from "lucide-react";
-import { toast } from "sonner";
+} from '@dnd-kit/sortable';
+import { PuzzleCard } from './PuzzleCard';
+import { Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface Puzzle {
   id: string;
@@ -62,23 +62,22 @@ export function SortablePuzzleList({
 }: SortablePuzzleListProps) {
   const [items, setItems] = useState(initialPuzzles);
   const [isReordering, setIsReordering] = useState(false);
+  let toastId: string | number = '';
 
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
-    }),
+    })
   );
 
   const handlePuzzleUpdate = (updatedPuzzle: any) => {
-    // Update the local state
     setItems((prevItems) =>
       prevItems.map((item) =>
-        item.id === updatedPuzzle.id ? updatedPuzzle : item,
-      ),
+        item.id === updatedPuzzle.id ? updatedPuzzle : item
+      )
     );
 
-    // Notify parent
     if (onPuzzleUpdate) {
       onPuzzleUpdate(updatedPuzzle);
     }
@@ -91,6 +90,9 @@ export function SortablePuzzleList({
       const oldIndex = items.findIndex((item) => item.id === active.id);
       const newIndex = items.findIndex((item) => item.id === over.id);
 
+      // Show loading toast
+      toastId = toast.loading('Reordering puzzles...');
+
       const newItems = arrayMove(items, oldIndex, newIndex);
       setItems(newItems);
 
@@ -100,14 +102,19 @@ export function SortablePuzzleList({
         setIsReordering(true);
         try {
           await onReorder(reorderedIds);
-          toast.success("Puzzles reordered successfully! 📋");
+          toast.dismiss(toastId);
+          toast.success('Puzzles reordered successfully! ??');
         } catch (error) {
-          console.error("Failed to reorder puzzles:", error);
-          toast.error("Failed to reorder puzzles");
+          console.error('Failed to reorder puzzles:', error);
+          toast.dismiss(toastId);
+          toast.error('Failed to reorder puzzles');
           setItems(items);
         } finally {
           setIsReordering(false);
         }
+      } else {
+        // If no onReorder handler, just dismiss the toast
+        toast.dismiss(toastId);
       }
     }
   };
@@ -124,9 +131,7 @@ export function SortablePuzzleList({
     return (
       <div className="text-center py-12 text-gray-500">
         <p>No puzzles generated yet</p>
-        <p className="text-sm mt-1">
-          Puzzles will appear here when generation is complete
-        </p>
+        <p className="text-sm mt-1">Puzzles will appear here when generation is complete</p>
       </div>
     );
   }
