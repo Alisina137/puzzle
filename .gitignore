@@ -53,3 +53,5 @@ logs/
 
 # turbo
 .turbo
+.env.production
+.vercel
