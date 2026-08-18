@@ -22,20 +22,19 @@ model User {
 }
 
 model Book {
-  id           String   @id @default(cuid())
-  userId       String
-  title        String   @db.VarChar(255)
-  theme        String   @db.VarChar(100)
-  puzzleCount  Int      @default(0)
-  status       String   @default("pending")
-  qualityScore Decimal? @db.Decimal(5, 2)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  bookPuzzles  BookPuzzle[]
+  id             String          @id @default(cuid())
+  userId         String
+  title          String          @db.VarChar(255)
+  theme          String          @db.VarChar(100)
+  puzzleCount    Int             @default(0)
+  status         String          @default("pending")
+  qualityScore   Decimal?        @db.Decimal(5, 2)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  bookPuzzles    BookPuzzle[]
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exports        Export[]
   generationJobs GenerationJob[]
-  exports      Export[]
 
   @@index([userId])
   @@index([status])
@@ -43,30 +42,28 @@ model Book {
 }
 
 model Puzzle {
-  id           String   @id @default(cuid())
-  type         String   @default("wordsearch")
+  id           String          @id @default(cuid())
+  type         String          @default("wordsearch")
   data         Json
-  difficulty   String?  @default("medium")
-  qualityScore Decimal? @db.Decimal(5, 2)
-  createdAt    DateTime @default(now())
-  
-  versions     PuzzleVersion[]
+  difficulty   String?         @default("medium")
+  qualityScore Decimal?        @db.Decimal(5, 2)
+  createdAt    DateTime        @default(now())
   bookPuzzles  BookPuzzle[]
+  versions     PuzzleVersion[]
 
   @@index([type])
   @@map("puzzles")
 }
 
 model PuzzleVersion {
-  id             String   @id @default(cuid())
-  puzzleId       String
-  versionNumber  Int
-  data           Json
-  isActive       Boolean  @default(false)
-  createdAt      DateTime @default(now())
-
-  puzzle         Puzzle   @relation(fields: [puzzleId], references: [id], onDelete: Cascade)
-  bookPuzzles    BookPuzzle[]
+  id            String       @id @default(cuid())
+  puzzleId      String
+  versionNumber Int
+  data          Json
+  isActive      Boolean      @default(false)
+  createdAt     DateTime     @default(now())
+  bookPuzzles   BookPuzzle[]
+  puzzle        Puzzle       @relation(fields: [puzzleId], references: [id], onDelete: Cascade)
 
   @@unique([puzzleId, versionNumber])
   @@index([puzzleId])
@@ -74,19 +71,18 @@ model PuzzleVersion {
 }
 
 model BookPuzzle {
-  id               String   @id @default(cuid())
-  bookId           String
-  puzzleId         String
-  puzzleVersionId  String
-  position         Int
-  displayNumber    Int
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-
-  book             Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
-  puzzle           Puzzle   @relation(fields: [puzzleId], references: [id])
-  puzzleVersion    PuzzleVersion @relation(fields: [puzzleVersionId], references: [id])
-  solution         Solution?
+  id              String        @id @default(cuid())
+  bookId          String
+  puzzleId        String
+  puzzleVersionId String
+  position        Int
+  displayNumber   Int
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  book            Book          @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  puzzle          Puzzle        @relation(fields: [puzzleId], references: [id])
+  puzzleVersion   PuzzleVersion @relation(fields: [puzzleVersionId], references: [id])
+  solution        Solution?
 
   @@unique([bookId, position])
   @@unique([bookId, displayNumber])
@@ -95,40 +91,37 @@ model BookPuzzle {
 }
 
 model Solution {
-  id             String   @id @default(cuid())
-  bookPuzzleId   String   @unique
-  data           Json
-  validatedAt    DateTime?
-  isValid        Boolean?
-  createdAt      DateTime @default(now())
-
-  bookPuzzle     BookPuzzle @relation(fields: [bookPuzzleId], references: [id], onDelete: Cascade)
+  id           String     @id @default(cuid())
+  bookPuzzleId String     @unique
+  data         Json
+  validatedAt  DateTime?
+  isValid      Boolean?
+  createdAt    DateTime   @default(now())
+  bookPuzzle   BookPuzzle @relation(fields: [bookPuzzleId], references: [id], onDelete: Cascade)
 
   @@map("solutions")
 }
 
 model Theme {
-  id           String   @id @default(cuid())
-  name         String   @unique @db.VarChar(100)
-  category     String?  @db.VarChar(50)
-  isCustom     Boolean  @default(false)
-  wordCount    Int      @default(0)
-  createdAt    DateTime @default(now())
-
-  words        ThemeWord[]
+  id        String      @id @default(cuid())
+  name      String      @unique @db.VarChar(100)
+  category  String?     @db.VarChar(50)
+  isCustom  Boolean     @default(false)
+  wordCount Int         @default(0)
+  createdAt DateTime    @default(now())
+  words     ThemeWord[]
 
   @@index([name])
   @@map("themes")
 }
 
 model ThemeWord {
-  id           String   @id @default(cuid())
-  themeId      String
-  word         String   @db.VarChar(50)
-  difficulty   String?  @default("medium")
-  createdAt    DateTime @default(now())
-
-  theme        Theme    @relation(fields: [themeId], references: [id], onDelete: Cascade)
+  id         String   @id @default(cuid())
+  themeId    String
+  word       String   @db.VarChar(50)
+  difficulty String?  @default("medium")
+  createdAt  DateTime @default(now())
+  theme      Theme    @relation(fields: [themeId], references: [id], onDelete: Cascade)
 
   @@unique([themeId, word])
   @@index([themeId])
@@ -136,21 +129,20 @@ model ThemeWord {
 }
 
 model GenerationJob {
-  id             String   @id @default(cuid())
+  id             String              @id @default(cuid())
   bookId         String
-  status         String   @default("pending")
+  status         String              @default("pending")
   requestedCount Int
-  generatedCount Int      @default(0)
-  validCount     Int      @default(0)
-  rejectedCount  Int      @default(0)
-  error          String?  @db.Text
+  generatedCount Int                 @default(0)
+  validCount     Int                 @default(0)
+  rejectedCount  Int                 @default(0)
+  error          String?
   log            Json?
   startedAt      DateTime?
   completedAt    DateTime?
-  createdAt      DateTime @default(now())
-
-  book           Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  createdAt      DateTime            @default(now())
   attempts       GenerationAttempt[]
+  book           Book                @relation(fields: [bookId], references: [id], onDelete: Cascade)
 
   @@index([bookId])
   @@index([status])
@@ -158,37 +150,35 @@ model GenerationJob {
 }
 
 model GenerationAttempt {
-  id               String   @id @default(cuid())
-  generationJobId  String
-  puzzleId         String?
-  attemptNumber    Int
-  status           String   @default("pending")
-  error            String?  @db.Text
-  createdAt        DateTime @default(now())
-
-  generationJob    GenerationJob @relation(fields: [generationJobId], references: [id], onDelete: Cascade)
+  id              String        @id @default(cuid())
+  generationJobId String
+  puzzleId        String?
+  attemptNumber   Int
+  status          String        @default("pending")
+  error           String?
+  createdAt       DateTime      @default(now())
+  generationJob   GenerationJob @relation(fields: [generationJobId], references: [id], onDelete: Cascade)
 
   @@index([generationJobId])
   @@map("generation_attempts")
 }
 
 model Export {
-  id               String   @id @default(cuid())
-  bookId           String
-  userId           String
-  format           String   @default("pdf")
-  status           String   @default("pending")
-  url              String?  @db.Text
-  filesize         Int?
-  preflightPassed  Boolean?
-  preflightErrors  Json?
+  id                String    @id @default(cuid())
+  bookId            String
+  userId            String
+  format            String    @default("pdf")
+  status            String    @default("pending")
+  url               String?
+  filesize          Int?
+  preflightPassed   Boolean?
+  preflightErrors   Json?
   preflightWarnings Json?
-  options          Json?
-  createdAt        DateTime @default(now())
-  completedAt      DateTime?
-
-  book             Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
-  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  options           Json?
+  createdAt         DateTime  @default(now())
+  completedAt       DateTime?
+  book              Book      @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([bookId])
   @@index([userId])
@@ -198,10 +188,10 @@ model Export {
 model Template {
   id           String   @id @default(cuid())
   name         String   @db.VarChar(100)
-  description  String?  @db.Text
+  description  String?
   isDefault    Boolean  @default(false)
   config       Json
-  previewImage String?  @db.Text
+  previewImage String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

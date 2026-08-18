@@ -1,0 +1,616 @@
+import PDFDocument from "pdfkit";
+import { prisma } from "@/lib/prisma";
+
+export interface PDFOptions {
+  pageSize?: "A4" | "Letter";
+  includeSolutions?: boolean;
+  solutionPlacement?: "back" | "after";
+  fontSize?: number;
+  fontName?: string;
+  margins?: {
+    top: number;
+    bottom: number;
+    left: number;
+    right: number;
+  };
+}
+
+export interface PDFResult {
+  buffer: Buffer;
+  pageCount: number;
+}
+
+interface PuzzleWord {
+  word: string;
+  startRow?: number;
+  startCol?: number;
+  endRow?: number;
+  endCol?: number;
+}
+
+interface PuzzleData {
+  grid?: unknown[][];
+  words?: unknown[];
+}
+
+interface SolutionData {
+  words: PuzzleWord[];
+}
+
+export class PDFGenerator {
+  private static readonly DEFAULT_OPTIONS: Required<
+    Omit<PDFOptions, "margins">
+  > & {
+    margins: Required<NonNullable<PDFOptions["margins"]>>;
+  } = {
+    pageSize: "A4",
+    includeSolutions: true,
+    solutionPlacement: "back",
+    fontSize: 10,
+    fontName: "Helvetica",
+    margins: {
+      top: 72,
+      bottom: 72,
+      left: 72,
+      right: 72,
+    },
+  };
+
+  /**
+   * Generate a complete PDF for a book.
+   */
+  static async generateBookPDF(
+    bookId: string,
+    options: PDFOptions = {},
+  ): Promise<PDFResult> {
+    const opts = {
+      ...this.DEFAULT_OPTIONS,
+      ...options,
+      margins: {
+        ...this.DEFAULT_OPTIONS.margins,
+        ...(options.margins ?? {}),
+      },
+    };
+
+    const book = await prisma.book.findUnique({
+      where: { id: bookId },
+      include: {
+        bookPuzzles: {
+          include: {
+            puzzle: true,
+            puzzleVersion: true,
+            solution: true,
+          },
+          orderBy: {
+            position: "asc",
+          },
+        },
+      },
+    });
+
+    if (!book) {
+      throw new Error("Book not found");
+    }
+
+    const doc = new PDFDocument({
+      size: opts.pageSize === "A4" ? "A4" : "LETTER",
+      margins: opts.margins,
+      autoFirstPage: true,
+      info: {
+        Title: book.title,
+        Author: "Puzzle Book Generator",
+        Subject: "Puzzle Book",
+        Keywords: "puzzle, word search, book",
+        CreationDate: new Date(),
+      },
+    });
+
+    const buffers: Buffer[] = [];
+
+    doc.on("data", (chunk: Buffer) => {
+      buffers.push(chunk);
+    });
+
+    return new Promise<PDFResult>((resolve, reject) => {
+      doc.on("end", () => {
+        try {
+          resolve({
+            buffer: Buffer.concat(buffers),
+            pageCount: doc.bufferedPageRange().count,
+          });
+        } catch (error) {
+          reject(error);
+        }
+      });
+
+      doc.on("error", reject);
+
+      try {
+        // ---------------------------------------------------------
+        // TITLE PAGE
+        // ---------------------------------------------------------
+        this.addTitlePage(doc, book);
+
+        // ---------------------------------------------------------
+        // PUZZLES
+        // ---------------------------------------------------------
+        for (let i = 0; i < book.bookPuzzles.length; i++) {
+          const bookPuzzle = book.bookPuzzles[i];
+          const puzzleNumber = i + 1;
+
+          this.addPuzzlePage(doc, bookPuzzle, puzzleNumber, opts);
+
+          if (
+            opts.includeSolutions &&
+            opts.solutionPlacement === "after" &&
+            bookPuzzle.solution
+          ) {
+            this.addSolutionPage(doc, bookPuzzle, puzzleNumber);
+          }
+        }
+
+        // ---------------------------------------------------------
+        // SOLUTIONS AT BACK
+        // ---------------------------------------------------------
+        if (opts.includeSolutions && opts.solutionPlacement === "back") {
+          this.addSolutionsSection(doc, book.bookPuzzles);
+        }
+
+        doc.end();
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  /**
+   * Add the book title page.
+   */
+  private static addTitlePage(
+    doc: PDFKit.PDFDocument,
+    book: {
+      title: string;
+      theme: string;
+      puzzleCount: number;
+    },
+  ): void {
+    const pageWidth = doc.page.width;
+    const pageHeight = doc.page.height;
+
+    const contentX = 72;
+    const contentWidth = pageWidth - 144;
+
+    doc.font("Helvetica-Bold");
+    doc.fontSize(24);
+
+    doc.text(book.title, contentX, pageHeight / 2 - 100, {
+      align: "center",
+      width: contentWidth,
+    });
+
+    doc.font("Helvetica");
+    doc.fontSize(14);
+
+    doc.text("A Puzzle Book", contentX, pageHeight / 2 - 60, {
+      align: "center",
+      width: contentWidth,
+    });
+
+    doc.fontSize(12);
+
+    const theme = book.theme
+      ? book.theme.charAt(0).toUpperCase() + book.theme.slice(1)
+      : "General";
+
+    doc.text(`Theme: ${theme}`, contentX, pageHeight / 2 - 30, {
+      align: "center",
+      width: contentWidth,
+    });
+
+    doc.text(`${book.puzzleCount} Puzzles`, contentX, pageHeight / 2, {
+      align: "center",
+      width: contentWidth,
+    });
+
+    doc.fontSize(10);
+
+    doc.text("Generated by Puzzle Book Generator", contentX, pageHeight - 50, {
+      align: "center",
+      width: contentWidth,
+    });
+
+    doc.text(new Date().toLocaleDateString(), contentX, pageHeight - 35, {
+      align: "center",
+      width: contentWidth,
+    });
+
+    doc.addPage();
+  }
+
+  /**
+   * Add a puzzle page.
+   */
+  private static addPuzzlePage(
+    doc: PDFKit.PDFDocument,
+    bookPuzzle: any,
+    puzzleNumber: number,
+    options: PDFOptions,
+  ): void {
+    const data = this.parsePuzzleData(bookPuzzle.puzzle?.data);
+
+    const grid = this.normalizeGrid(data.grid);
+    const words = this.normalizeWords(data.words);
+
+    doc.font("Helvetica-Bold");
+    doc.fontSize(16);
+
+    doc.text(`Puzzle #${puzzleNumber}`, {
+      align: "center",
+    });
+
+    doc.moveDown(0.5);
+
+    doc.font("Helvetica");
+    doc.fontSize(options.fontSize ?? 10);
+
+    if (words.length > 0) {
+      doc.text(`Words to find: ${words.join(", ")}`, {
+        align: "center",
+      });
+    } else {
+      doc.text("Find the hidden words in the puzzle.", {
+        align: "center",
+      });
+    }
+
+    doc.moveDown(0.75);
+
+    this.drawGrid(doc, grid);
+
+    doc.moveDown(0.5);
+
+    doc.font("Helvetica");
+    doc.fontSize(8);
+
+    const difficulty = bookPuzzle.puzzle?.difficulty || "medium";
+
+    doc.text(`Difficulty: ${this.capitalize(String(difficulty))}`, {
+      align: "center",
+    });
+
+    const qualityScore = bookPuzzle.puzzle?.qualityScore;
+
+    if (typeof qualityScore === "number" && Number.isFinite(qualityScore)) {
+      doc.text(`Quality Score: ${qualityScore}/100`, {
+        align: "center",
+      });
+    }
+
+    doc.addPage();
+  }
+
+  /**
+   * Draw a word-search grid.
+   */
+  private static drawGrid(doc: PDFKit.PDFDocument, grid: string[][]): void {
+    if (
+      !Array.isArray(grid) ||
+      grid.length === 0 ||
+      !Array.isArray(grid[0]) ||
+      grid[0].length === 0
+    ) {
+      doc.font("Helvetica");
+      doc.fontSize(10);
+      doc.text("Puzzle grid unavailable.", {
+        align: "center",
+      });
+      return;
+    }
+
+    const rowCount = grid.length;
+    const columnCount = grid[0].length;
+
+    const cellSize = this.calculateCellSize(doc, rowCount, columnCount);
+
+    const gridWidth = columnCount * cellSize;
+
+    const startX = (doc.page.width - gridWidth) / 2;
+
+    const startY = doc.y + 20;
+
+    for (let row = 0; row < rowCount; row++) {
+      for (let column = 0; column < columnCount; column++) {
+        const x = startX + column * cellSize;
+        const y = startY + row * cellSize;
+
+        // Cell border
+        doc.rect(x, y, cellSize, cellSize).stroke();
+
+        const letter = grid[row]?.[column] ?? "";
+
+        if (letter !== "") {
+          doc.font("Helvetica-Bold");
+
+          doc.fontSize(Math.min(cellSize * 0.55, 16));
+
+          // Center the letter inside the cell.
+          const textWidth = doc.widthOfString(letter);
+
+          const textX = x + (cellSize - textWidth) / 2;
+
+          const textY = y + (cellSize - doc.currentLineHeight()) / 2 - 1;
+
+          doc.text(letter, textX, textY, {
+            lineBreak: false,
+          });
+        }
+      }
+    }
+
+    doc.y = startY + rowCount * cellSize + 20;
+  }
+
+  /**
+   * Calculate a safe grid cell size.
+   */
+  private static calculateCellSize(
+    doc: PDFKit.PDFDocument,
+    rows: number,
+    columns: number,
+  ): number {
+    if (rows <= 0 || columns <= 0) {
+      return 20;
+    }
+
+    const availableWidth =
+      doc.page.width - doc.page.margins.left - doc.page.margins.right;
+
+    const availableHeight =
+      doc.page.height - doc.page.margins.top - doc.page.margins.bottom - 180;
+
+    const sizeByWidth = availableWidth / columns;
+
+    const sizeByHeight = availableHeight / rows;
+
+    return Math.max(10, Math.min(sizeByWidth, sizeByHeight, 32));
+  }
+
+  /**
+   * Add a solution page immediately after a puzzle.
+   */
+  private static addSolutionPage(
+    doc: PDFKit.PDFDocument,
+    bookPuzzle: any,
+    puzzleNumber: number,
+  ): void {
+    const solutionData = this.parseSolutionData(bookPuzzle.solution?.data);
+
+    doc.font("Helvetica-Bold");
+    doc.fontSize(14);
+
+    doc.text(`Solution #${puzzleNumber}`, {
+      align: "center",
+    });
+
+    doc.moveDown(0.75);
+
+    if (solutionData.words.length > 0) {
+      doc.font("Helvetica");
+      doc.fontSize(10);
+
+      for (const word of solutionData.words) {
+        const coordinates = this.formatCoordinates(word);
+
+        doc.text(`${word.word}${coordinates}`, {
+          align: "center",
+        });
+
+        doc.moveDown(0.25);
+      }
+    } else {
+      doc.font("Helvetica");
+      doc.fontSize(10);
+
+      doc.text("No solution information available.", {
+        align: "center",
+      });
+    }
+
+    doc.addPage();
+  }
+
+  /**
+   * Add all solutions at the end of the book.
+   */
+  private static addSolutionsSection(
+    doc: PDFKit.PDFDocument,
+    bookPuzzles: any[],
+  ): void {
+    doc.font("Helvetica-Bold");
+    doc.fontSize(18);
+
+    doc.text("Solutions", {
+      align: "center",
+    });
+
+    doc.moveDown();
+
+    for (let i = 0; i < bookPuzzles.length; i++) {
+      const bookPuzzle = bookPuzzles[i];
+
+      const puzzleNumber = i + 1;
+
+      const solutionData = this.parseSolutionData(bookPuzzle.solution?.data);
+
+      doc.font("Helvetica-Bold");
+      doc.fontSize(12);
+
+      doc.text(`Puzzle #${puzzleNumber}`);
+
+      doc.moveDown(0.25);
+
+      doc.font("Helvetica");
+      doc.fontSize(10);
+
+      if (solutionData.words.length > 0) {
+        for (const word of solutionData.words) {
+          doc.text(`${word.word}${this.formatCoordinates(word)}`);
+        }
+      } else {
+        doc.text("No solution available");
+      }
+
+      doc.moveDown(0.75);
+
+      /*
+       * Prevent solution text from running off the page.
+       */
+      if (doc.y > doc.page.height - doc.page.margins.bottom - 60) {
+        doc.addPage();
+      }
+    }
+
+    doc.addPage();
+  }
+
+  /**
+   * Safely parse Prisma JSON puzzle data.
+   */
+  private static parsePuzzleData(value: unknown): PuzzleData {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      return {};
+    }
+
+    return value as PuzzleData;
+  }
+
+  /**
+   * Convert unknown grid data into string[][].
+   */
+  private static normalizeGrid(value: unknown): string[][] {
+    if (!Array.isArray(value)) {
+      return [];
+    }
+
+    return value
+      .filter(Array.isArray)
+      .map((row) => row.map((cell) => (cell == null ? "" : String(cell))));
+  }
+
+  /**
+   * Convert unknown word data into string[].
+   */
+  private static normalizeWords(value: unknown): string[] {
+    if (!Array.isArray(value)) {
+      return [];
+    }
+
+    return value
+      .map((word) => {
+        if (typeof word === "string") {
+          return word;
+        }
+
+        if (typeof word === "object" && word !== null && "word" in word) {
+          return String((word as { word: unknown }).word);
+        }
+
+        return String(word);
+      })
+      .filter(Boolean);
+  }
+
+  /**
+   * Safely parse Prisma JSON solution data.
+   */
+  private static parseSolutionData(value: unknown): SolutionData {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      return {
+        words: [],
+      };
+    }
+
+    const rawWords = (
+      value as {
+        words?: unknown;
+      }
+    ).words;
+
+    if (!Array.isArray(rawWords)) {
+      return {
+        words: [],
+      };
+    }
+
+    const words: PuzzleWord[] = [];
+
+    for (const item of rawWords) {
+      if (!item || typeof item !== "object") {
+        continue;
+      }
+
+      const raw = item as Record<string, unknown>;
+
+      if (typeof raw.word !== "string") {
+        continue;
+      }
+
+      words.push({
+        word: raw.word,
+        startRow: this.toNumber(raw.startRow),
+        startCol: this.toNumber(raw.startCol),
+        endRow: this.toNumber(raw.endRow),
+        endCol: this.toNumber(raw.endCol),
+      });
+    }
+
+    return { words };
+  }
+
+  /**
+   * Format a solution word's coordinates.
+   */
+  private static formatCoordinates(word: PuzzleWord): string {
+    const hasCoordinates =
+      typeof word.startRow === "number" &&
+      typeof word.startCol === "number" &&
+      typeof word.endRow === "number" &&
+      typeof word.endCol === "number";
+
+    if (!hasCoordinates) {
+      return "";
+    }
+
+    return `: (${word.startRow},${word.startCol}) -> (${word.endRow},${word.endCol})`;
+  }
+
+  /**
+   * Safely convert an unknown value to a number.
+   */
+  private static toNumber(value: unknown): number | undefined {
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return value;
+    }
+
+    if (typeof value === "string" && value.trim() !== "") {
+      const parsed = Number(value);
+
+      if (Number.isFinite(parsed)) {
+        return parsed;
+      }
+    }
+
+    return undefined;
+  }
+
+  /**
+   * Capitalize a string.
+   */
+  private static capitalize(value: string): string {
+    if (!value) {
+      return "";
+    }
+
+    return value.charAt(0).toUpperCase() + value.slice(1);
+  }
+}

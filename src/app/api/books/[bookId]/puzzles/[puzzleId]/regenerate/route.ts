@@ -9,12 +9,60 @@ import { SolutionGenerator } from "@/modules/puzzle/solution-generator";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 
+interface GeneratedPuzzleData {
+  grid: string[][];
+  words: string[];
+  placedWords: any[];
+  size: number;
+}
+
+interface StoredPuzzleData {
+  grid: string[][];
+  words: string[];
+  placedWords: any[];
+  size?: number;
+}
+
+function getPuzzleData(data: unknown): StoredPuzzleData | null {
+  if (!data || typeof data !== "object" || Array.isArray(data)) {
+    return null;
+  }
+
+  const value = data as Record<string, unknown>;
+
+  const grid = Array.isArray(value.grid)
+    ? value.grid
+        .filter((row): row is unknown[] => Array.isArray(row))
+        .map((row) =>
+          row.filter((cell): cell is string => typeof cell === "string"),
+        )
+    : [];
+
+  const words = Array.isArray(value.words)
+    ? value.words.filter((word): word is string => typeof word === "string")
+    : [];
+
+  const placedWords = Array.isArray(value.placedWords) ? value.placedWords : [];
+
+  return {
+    grid,
+    words,
+    placedWords,
+    size: typeof value.size === "number" ? value.size : undefined,
+  };
+}
+
 export async function POST(
-  req: NextRequest,
-  context: { params: { bookId: string; puzzleId: string } },
+  _req: NextRequest,
+  context: {
+    params: {
+      bookId: string;
+      puzzleId: string;
+    };
+  },
 ) {
   try {
-    console.log("?? Regeneration started");
+    console.log("Regeneration started");
 
     const session = await getServerSession(authOptions);
 
@@ -23,13 +71,22 @@ export async function POST(
     }
 
     const { bookId, puzzleId } = context.params;
-    console.log("?? Book ID:", bookId);
-    console.log("?? Puzzle ID:", puzzleId);
 
-    // Get book details
+    console.log("Book ID:", bookId);
+    console.log("Puzzle ID:", puzzleId);
+
+    // --------------------------------------------------
+    // 1. Get book and verify ownership
+    // --------------------------------------------------
+
     const book = await prisma.book.findUnique({
-      where: { id: bookId },
-      select: { userId: true, theme: true },
+      where: {
+        id: bookId,
+      },
+      select: {
+        userId: true,
+        theme: true,
+      },
     });
 
     if (!book) {
@@ -40,13 +97,16 @@ export async function POST(
       return Response.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    console.log("?? Book found, theme:", book.theme);
+    console.log("Book found, theme:", book.theme);
 
-    // Find the book puzzle
+    // --------------------------------------------------
+    // 2. Find puzzle
+    // --------------------------------------------------
+
     const bookPuzzle = await prisma.bookPuzzle.findFirst({
       where: {
         id: puzzleId,
-        bookId: bookId,
+        bookId,
       },
       include: {
         puzzle: {
@@ -59,16 +119,23 @@ export async function POST(
 
     if (!bookPuzzle) {
       return Response.json(
-        { error: "Puzzle not found in this book" },
+        {
+          error: "Puzzle not found in this book",
+        },
         { status: 404 },
       );
     }
 
-    console.log("?? Puzzle found");
+    console.log("Puzzle found");
 
-    // Get existing puzzles for duplicate check
+    // --------------------------------------------------
+    // 3. Get existing puzzles
+    // --------------------------------------------------
+
     const existingPuzzles = await prisma.bookPuzzle.findMany({
-      where: { bookId: bookId },
+      where: {
+        bookId,
+      },
       include: {
         puzzle: {
           include: {
@@ -78,25 +145,52 @@ export async function POST(
       },
     });
 
-    const existingFingerprints = existingPuzzles.map((bp) => {
-      const activeVersion = bp.puzzle.versions.find((v) => v.isActive);
-      return DuplicateDetector.createFingerprint(
-        activeVersion?.data?.grid || [],
-        activeVersion?.data?.words || [],
-        activeVersion?.data?.placedWords || [],
+    // --------------------------------------------------
+    // 4. Create fingerprints
+    // --------------------------------------------------
+
+    const existingFingerprints = existingPuzzles
+      .map((bp) => {
+        const activeVersion = bp.puzzle.versions.find(
+          (version) => version.isActive,
+        );
+
+        const puzzleData = getPuzzleData(activeVersion?.data);
+
+        if (!puzzleData) {
+          return null;
+        }
+
+        return DuplicateDetector.createFingerprint(
+          puzzleData.grid,
+          puzzleData.words,
+          puzzleData.placedWords,
+        );
+      })
+      .filter(
+        (
+          fingerprint,
+        ): fingerprint is ReturnType<
+          typeof DuplicateDetector.createFingerprint
+        > => fingerprint !== null,
       );
-    });
+
+    // --------------------------------------------------
+    // 5. Generate replacement puzzle
+    // --------------------------------------------------
 
     let attempts = 0;
     const maxAttempts = 10;
-    let newPuzzleData: any = null;
+
+    let newPuzzleData: GeneratedPuzzleData | null = null;
+
     let newSolution: any = null;
 
     while (attempts < maxAttempts) {
       attempts++;
 
       try {
-        console.log("?? Attempt", attempts);
+        console.log("Attempt", attempts);
 
         const wordResult = WordSelectionService.selectWords({
           theme: book.theme,
@@ -105,11 +199,20 @@ export async function POST(
         });
 
         const words = wordResult.words;
-        const gridResult = GridGenerator.generate({ difficulty: "medium" });
+
+        const gridResult = GridGenerator.generate({
+          difficulty: "medium",
+        });
+
         const grid = gridResult.grid;
+
         const placement = WordPlacer.placeWords(grid, words, {
           maxAttempts: 10,
         });
+
+        // --------------------------------------------------
+        // Validate
+        // --------------------------------------------------
 
         const validation = PuzzleValidator.validatePuzzle(
           placement.grid,
@@ -118,9 +221,13 @@ export async function POST(
         );
 
         if (!validation.valid) {
-          console.log("?? Validation failed");
+          console.log("Validation failed");
           continue;
         }
+
+        // --------------------------------------------------
+        // Duplicate detection
+        // --------------------------------------------------
 
         const fingerprint = DuplicateDetector.createFingerprint(
           placement.grid,
@@ -134,9 +241,13 @@ export async function POST(
         );
 
         if (duplicateCheck && duplicateCheck.isDuplicate) {
-          console.log("?? Duplicate detected");
+          console.log("Duplicate detected");
           continue;
         }
+
+        // --------------------------------------------------
+        // Generate solution
+        // --------------------------------------------------
 
         const solution = SolutionGenerator.generateSolution(
           placement.grid,
@@ -150,25 +261,36 @@ export async function POST(
         );
 
         if (!verification.valid) {
-          console.log("?? Solution invalid");
+          console.log("Solution invalid");
           continue;
         }
 
+        // --------------------------------------------------
+        // Successful generation
+        // --------------------------------------------------
+
         newPuzzleData = {
           grid: placement.grid,
-          words: words,
+          words,
           placedWords: placement.placedWords,
           size: placement.grid.length,
         };
 
         newSolution = solution;
-        console.log("? New puzzle generated on attempt", attempts);
+
+        console.log("New puzzle generated on attempt", attempts);
+
         break;
       } catch (error) {
-        console.error("? Attempt", attempts, "failed:", error);
+        console.error("Attempt", attempts, "failed:", error);
+
         continue;
       }
     }
+
+    // --------------------------------------------------
+    // 6. Verify generation
+    // --------------------------------------------------
 
     if (!newPuzzleData) {
       return Response.json(
@@ -182,38 +304,68 @@ export async function POST(
       );
     }
 
-    // Update the puzzle
+    // --------------------------------------------------
+    // 7. Prepare JSON-safe data for Prisma
+    // --------------------------------------------------
+
+    const puzzleDataForPrisma = {
+      grid: newPuzzleData.grid,
+      words: newPuzzleData.words,
+      placedWords: newPuzzleData.placedWords,
+      size: newPuzzleData.size,
+    };
+
+    // --------------------------------------------------
+    // 8. Update puzzle
+    // --------------------------------------------------
+
     const updatedPuzzle = await prisma.puzzle.update({
-      where: { id: bookPuzzle.puzzleId },
+      where: {
+        id: bookPuzzle.puzzleId,
+      },
       data: {
-        data: newPuzzleData,
+        data: puzzleDataForPrisma,
         difficulty: "medium",
         qualityScore: 85,
       },
     });
 
-    console.log("? Puzzle updated");
+    console.log("Puzzle updated");
 
-    // Create new version
+    // --------------------------------------------------
+    // 9. Get current version
+    // --------------------------------------------------
+
     const currentVersion = await prisma.puzzleVersion.findFirst({
-      where: { puzzleId: bookPuzzle.puzzleId },
-      orderBy: { versionNumber: "desc" },
+      where: {
+        puzzleId: bookPuzzle.puzzleId,
+      },
+      orderBy: {
+        versionNumber: "desc",
+      },
     });
 
     const newVersionNumber = (currentVersion?.versionNumber || 0) + 1;
+
+    // --------------------------------------------------
+    // 10. Create new version
+    // --------------------------------------------------
 
     const newPuzzleVersion = await prisma.puzzleVersion.create({
       data: {
         puzzleId: updatedPuzzle.id,
         versionNumber: newVersionNumber,
-        data: newPuzzleData,
+        data: puzzleDataForPrisma,
         isActive: true,
       },
     });
 
-    console.log("? Version created:", newVersionNumber);
+    console.log("Version created:", newVersionNumber);
 
-    // Deactivate old versions
+    // --------------------------------------------------
+    // 11. Deactivate old versions
+    // --------------------------------------------------
+
     await prisma.puzzleVersion.updateMany({
       where: {
         puzzleId: updatedPuzzle.id,
@@ -227,9 +379,14 @@ export async function POST(
       },
     });
 
-    // Update book puzzle
+    // --------------------------------------------------
+    // 12. Update book puzzle
+    // --------------------------------------------------
+
     const updatedBookPuzzle = await prisma.bookPuzzle.update({
-      where: { id: bookPuzzle.id },
+      where: {
+        id: bookPuzzle.id,
+      },
       data: {
         puzzleVersionId: newPuzzleVersion.id,
       },
@@ -240,20 +397,31 @@ export async function POST(
       },
     });
 
-    // Update solution
-    await prisma.solution.update({
-      where: { bookPuzzleId: bookPuzzle.id },
-      data: {
-        data: {
-          grid: newSolution.grid,
-          words: newSolution.words,
-        },
-        validatedAt: new Date(),
-        isValid: true,
-      },
-    });
+    // --------------------------------------------------
+    // 13. Update solution
+    // --------------------------------------------------
 
-    console.log("? Regeneration complete");
+    if (newSolution) {
+      await prisma.solution.update({
+        where: {
+          bookPuzzleId: bookPuzzle.id,
+        },
+        data: {
+          data: {
+            grid: newSolution.grid,
+            words: newSolution.words,
+          },
+          validatedAt: new Date(),
+          isValid: true,
+        },
+      });
+    }
+
+    console.log("Regeneration complete");
+
+    // --------------------------------------------------
+    // 14. Return response
+    // --------------------------------------------------
 
     return Response.json({
       success: true,
@@ -261,13 +429,19 @@ export async function POST(
         bookPuzzle: updatedBookPuzzle,
         message: "Puzzle regenerated successfully",
         version: newVersionNumber,
-        attempts: attempts,
+        attempts,
       },
     });
-  } catch (error: any) {
-    console.error("? Regeneration error:", error);
+  } catch (error: unknown) {
+    console.error("Regeneration error:", error);
+
     return Response.json(
-      { error: error.message || "Failed to regenerate puzzle" },
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to regenerate puzzle",
+      },
       { status: 500 },
     );
   }
