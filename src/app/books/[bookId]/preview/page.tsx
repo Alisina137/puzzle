@@ -25,6 +25,12 @@ interface Book {
   bookPuzzles: any[];
 }
 
+interface PageItem {
+  type: 'puzzle' | 'solution';
+  number: number;
+  data: any;
+}
+
 // Color palette for different words
 const WORD_COLORS = [
   { bg: 'bg-red-200', border: 'border-red-400', hover: 'hover:bg-red-300' },
@@ -79,8 +85,11 @@ export default function BookPreviewPage() {
   const [currentPage, setCurrentPage] = useState(0);
   const [showSolutions, setShowSolutions] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
-  const [pages, setPages] = useState<any[]>([]);
+  const [pages, setPages] = useState<PageItem[]>([]);
 
+  /*
+   * Fetch book
+   */
   useEffect(() => {
     if (!bookId) {
       setError('No book ID provided');
@@ -102,7 +111,6 @@ export default function BookPreviewPage() {
 
         if (response.status === 404) {
           setError('Book not found');
-          setLoading(false);
           return;
         }
 
@@ -112,12 +120,11 @@ export default function BookPreviewPage() {
 
         const result = await response.json();
 
-        if (!result.data) {
-          throw new Error('Book data was not returned');
+        if (!result?.data) {
+          throw new Error('Invalid book response');
         }
 
         setBook(result.data);
-        setError(null);
       } catch (err: any) {
         console.error('Error fetching book:', err);
         setError(err.message || 'Failed to load book');
@@ -129,45 +136,64 @@ export default function BookPreviewPage() {
     fetchBook();
   }, [bookId]);
 
+  /*
+   * Build preview pages whenever the book or solution visibility changes.
+   */
   useEffect(() => {
     if (!book) {
+      setPages([]);
       return;
     }
 
-    buildPages(book);
+    buildPages(book, showSolutions);
     setCurrentPage(0);
   }, [book, showSolutions]);
 
-  const buildPages = (bookData: Book) => {
-    const bookPuzzles = bookData.bookPuzzles || [];
+  /*
+   * Build puzzle/solution pages.
+   *
+   * When solutions are hidden:
+   *   Puzzle 1, Puzzle 2, Puzzle 3...
+   *
+   * When solutions are visible:
+   *   Puzzle 1, Solution 1, Puzzle 2, Solution 2...
+   */
+  const buildPages = (bookData: Book, includeSolutions: boolean) => {
+    const bookPuzzles = Array.isArray(bookData.bookPuzzles)
+      ? bookData.bookPuzzles
+      : [];
 
-    const puzzlePages = bookPuzzles.map((bp: any, index: number) => ({
-      type: 'puzzle',
-      number: index + 1,
-      data: bp,
-    }));
+    const puzzlePages: PageItem[] = bookPuzzles.map(
+      (bp: any, index: number) => ({
+        type: 'puzzle',
+        number: index + 1,
+        data: bp,
+      })
+    );
 
-    if (!showSolutions) {
+    if (!includeSolutions) {
       setPages(puzzlePages);
       return;
     }
 
-    const solutionPages = bookPuzzles.map((bp: any, index: number) => ({
-      type: 'solution',
-      number: index + 1,
-      data: bp,
-    }));
+    const interleavedPages: PageItem[] = [];
 
-    const interleaved: any[] = [];
+    puzzlePages.forEach((puzzlePage) => {
+      interleavedPages.push(puzzlePage);
 
-    for (let i = 0; i < puzzlePages.length; i++) {
-      interleaved.push(puzzlePages[i]);
-      interleaved.push(solutionPages[i]);
-    }
+      interleavedPages.push({
+        type: 'solution',
+        number: puzzlePage.number,
+        data: puzzlePage.data,
+      });
+    });
 
-    setPages(interleaved);
+    setPages(interleavedPages);
   };
 
+  /*
+   * Export PDF
+   */
   const handleExport = async () => {
     if (!book || isExporting) {
       return;
@@ -192,30 +218,33 @@ export default function BookPreviewPage() {
         let message = 'Failed to export';
 
         try {
-          const error = await response.json();
-          message = error.error || message;
+          const errorData = await response.json();
+          message = errorData?.error || message;
         } catch {
-          // Ignore JSON parsing errors
+          // Response was not JSON.
         }
 
         throw new Error(message);
       }
 
       const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
 
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
+
       link.href = url;
-      link.download = book.title.replace(/\s+/g, '_') + '.pdf';
+      link.download =
+        book.title.replace(/[^a-zA-Z0-9-_ ]/g, '').replace(/\s+/g, '_') +
+        '.pdf';
 
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
 
       window.URL.revokeObjectURL(url);
-    } catch (error: any) {
-      console.error('Export error:', error);
-      alert(error.message || 'Failed to export PDF');
+    } catch (err: any) {
+      console.error('Export error:', err);
+      alert(err.message || 'Failed to export PDF');
     } finally {
       setIsExporting(false);
     }
@@ -224,18 +253,22 @@ export default function BookPreviewPage() {
   const totalPages = pages.length;
   const currentPageData = pages[currentPage] || null;
 
+  /*
+   * Pagination
+   */
   const goToPreviousPage = () => {
-    if (currentPage > 0) {
-      setCurrentPage((prev) => prev - 1);
-    }
+    setCurrentPage((page) => Math.max(0, page - 1));
   };
 
   const goToNextPage = () => {
-    if (currentPage < totalPages - 1) {
-      setCurrentPage((prev) => prev + 1);
-    }
+    setCurrentPage((page) =>
+      Math.min(Math.max(totalPages - 1, 0), page + 1)
+    );
   };
 
+  /*
+   * Loading state
+   */
   if (loading) {
     return (
       <DashboardLayout>
@@ -249,6 +282,9 @@ export default function BookPreviewPage() {
     );
   }
 
+  /*
+   * Error state
+   */
   if (error || !book) {
     return (
       <DashboardLayout>
@@ -268,6 +304,9 @@ export default function BookPreviewPage() {
     );
   }
 
+  /*
+   * Book not ready
+   */
   if (book.status !== 'ready') {
     return (
       <DashboardLayout>
@@ -295,7 +334,7 @@ export default function BookPreviewPage() {
     <DashboardLayout>
       <div className="space-y-6">
 
-        {/* Header */}
+        {/* Header actions */}
         <div className="flex items-center justify-between flex-wrap gap-2">
           <Link
             href={'/books/' + bookId}
@@ -307,7 +346,8 @@ export default function BookPreviewPage() {
 
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setShowSolutions((prev) => !prev)}
+              type="button"
+              onClick={() => setShowSolutions((value) => !value)}
               className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
             >
               {showSolutions ? (
@@ -324,9 +364,10 @@ export default function BookPreviewPage() {
             </button>
 
             <button
+              type="button"
               onClick={handleExport}
               disabled={isExporting}
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isExporting ? (
                 <>
@@ -346,7 +387,7 @@ export default function BookPreviewPage() {
           </div>
         </div>
 
-        {/* Book Information */}
+        {/* Book information */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
           <h1 className="text-2xl font-bold text-gray-800">
             {book.title}
@@ -397,105 +438,81 @@ export default function BookPreviewPage() {
             )}
           </div>
 
-          {/* Navigation */}
-          <div className="flex items-center justify-between mt-4">
-            <button
-              onClick={goToPreviousPage}
-              disabled={currentPage === 0}
-              className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              <ChevronLeft size={18} />
-              Previous
-            </button>
+          {/* Pagination */}
+          {totalPages > 0 && (
+            <div className="flex items-center justify-between mt-4 gap-4">
+              <button
+                type="button"
+                onClick={goToPreviousPage}
+                disabled={currentPage === 0}
+                className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronLeft size={18} />
+                Previous
+              </button>
 
-            <div className="flex items-center gap-1">
-              {Array.from({
-                length: Math.min(totalPages, 10),
-              }).map((_, index) => {
-                const pageNum = index;
-                const isActive = pageNum === currentPage;
+              <div className="flex items-center gap-1 overflow-x-auto max-w-[60%]">
+                {Array.from({
+                  length: Math.min(totalPages, 10),
+                }).map((_, index) => {
+                  /*
+                   * Show a moving window of 10 pages when the book
+                   * contains more than 10 pages.
+                   */
+                  let pageNum = index;
 
-                return (
-                  <button
-                    key={pageNum}
-                    onClick={() => setCurrentPage(pageNum)}
-                    className={
-                      'w-8 h-8 rounded-lg text-sm transition-colors ' +
-                      (isActive
-                        ? 'bg-blue-600 text-white'
-                        : 'border border-gray-300 hover:bg-gray-50')
-                    }
-                  >
-                    {pageNum + 1}
-                  </button>
-                );
-              })}
+                  if (totalPages > 10) {
+                    const maxStart = totalPages - 10;
+                    const start = Math.min(
+                      Math.max(currentPage - 4, 0),
+                      maxStart
+                    );
+
+                    pageNum = start + index;
+                  }
+
+                  const isActive = pageNum === currentPage;
+
+                  return (
+                    <button
+                      type="button"
+                      key={pageNum}
+                      onClick={() => setCurrentPage(pageNum)}
+                      className={
+                        'w-8 h-8 min-w-8 rounded-lg text-sm transition-colors ' +
+                        (isActive
+                          ? 'bg-blue-600 text-white'
+                          : 'border border-gray-300 hover:bg-gray-50')
+                      }
+                    >
+                      {pageNum + 1}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <button
+                type="button"
+                onClick={goToNextPage}
+                disabled={
+                  currentPage >= totalPages - 1
+                }
+                className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                Next
+                <ChevronRight size={18} />
+              </button>
             </div>
-
-            <button
-              onClick={goToNextPage}
-              disabled={
-                totalPages === 0 ||
-                currentPage >= totalPages - 1
-              }
-              className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              Next
-              <ChevronRight size={18} />
-            </button>
-          </div>
+          )}
         </div>
       </div>
     </DashboardLayout>
   );
 }
 
-/**
- * Get all cells occupied by a word.
- *
- * This correctly handles horizontal, vertical,
- * and diagonal words without filling the rectangle
- * between start and end coordinates.
+/*
+ * Puzzle Page
  */
-function getWordCells(word: any): Array<[number, number]> {
-  const {
-    startRow,
-    startCol,
-    endRow,
-    endCol,
-  } = word;
-
-  const rowStep =
-    endRow === startRow
-      ? 0
-      : endRow > startRow
-        ? 1
-        : -1;
-
-  const colStep =
-    endCol === startCol
-      ? 0
-      : endCol > startCol
-        ? 1
-        : -1;
-
-  const rowDistance = Math.abs(endRow - startRow);
-  const colDistance = Math.abs(endCol - startCol);
-
-  const steps = Math.max(rowDistance, colDistance);
-  const cells: Array<[number, number]> = [];
-
-  for (let i = 0; i <= steps; i++) {
-    cells.push([
-      startRow + i * rowStep,
-      startCol + i * colStep,
-    ]);
-  }
-
-  return cells;
-}
-
-// Puzzle Page View Component
 function PuzzlePageView({
   data,
   number,
@@ -503,14 +520,22 @@ function PuzzlePageView({
   data: any;
   number: number;
 }) {
-  const grid = data?.puzzle?.data?.grid || [];
-  const words = data?.puzzle?.data?.words || [];
+  const puzzle = data?.puzzle;
+  const puzzleData = puzzle?.data || {};
+
+  const grid: string[][] = Array.isArray(puzzleData.grid)
+    ? puzzleData.grid
+    : [];
+
+  const words: string[] = Array.isArray(puzzleData.words)
+    ? puzzleData.words
+    : [];
 
   const gridSize = grid.length;
 
   const colLabels = Array.from(
     { length: gridSize },
-    (_, i) => String.fromCharCode(65 + i)
+    (_, i) => getColumnLabel(i)
   );
 
   return (
@@ -520,13 +545,17 @@ function PuzzlePageView({
       </h3>
 
       <p className="text-sm text-gray-600 text-center mb-4">
-        Words to find: {words.join(', ')}
+        Words to find:{' '}
+        {words.length > 0
+          ? words.join(', ')
+          : 'No words available'}
       </p>
 
+      {/* Grid */}
       {grid.length > 0 ? (
         <div className="flex justify-center overflow-x-auto">
           <div>
-            {/* Column headers */}
+            {/* Column labels */}
             <div className="flex">
               <div className="w-6 h-6 flex items-center justify-center text-xs font-bold text-gray-400 flex-shrink-0" />
 
@@ -540,14 +569,15 @@ function PuzzlePageView({
               ))}
             </div>
 
-            {/* Grid */}
-            {grid.map((row: string[], i: number) => (
+            {/* Grid rows */}
+            {grid.map((row, i) => (
               <div key={i} className="flex">
+                {/* Row number */}
                 <div className="w-6 h-8 flex items-center justify-center text-xs font-bold text-gray-400 flex-shrink-0">
                   {i + 1}
                 </div>
 
-                {row.map((cell: string, j: number) => (
+                {row.map((cell, j) => (
                   <div
                     key={i + '-' + j}
                     className="w-8 h-8 flex items-center justify-center text-sm font-mono border border-gray-300 bg-white flex-shrink-0"
@@ -565,14 +595,16 @@ function PuzzlePageView({
         </div>
       )}
 
-      <div className="mt-4 flex justify-center gap-4 text-xs text-gray-500">
+      {/* Puzzle metadata */}
+      <div className="mt-4 flex flex-wrap justify-center gap-4 text-xs text-gray-500">
         <span>
-          Difficulty: {data?.puzzle?.difficulty || 'medium'}
+          Difficulty:{' '}
+          {puzzle?.difficulty || 'medium'}
         </span>
 
-        {data?.puzzle?.qualityScore != null && (
+        {puzzle?.qualityScore != null && (
           <span>
-            Quality: {data.puzzle.qualityScore}/100
+            Quality: {puzzle.qualityScore}/100
           </span>
         )}
 
@@ -586,7 +618,9 @@ function PuzzlePageView({
   );
 }
 
-// Solution Page View Component
+/*
+ * Solution Page
+ */
 function SolutionPageView({
   data,
   number,
@@ -595,63 +629,136 @@ function SolutionPageView({
   number: number;
 }) {
   const solution = data?.solution;
-  const solutionWords = solution?.data?.words || [];
-  const grid = data?.puzzle?.data?.grid || [];
+
+  const solutionWords = Array.isArray(
+    solution?.data?.words
+  )
+    ? solution.data.words
+    : [];
+
+  const puzzleData = data?.puzzle?.data || {};
+
+  const grid: string[][] = Array.isArray(puzzleData.grid)
+    ? puzzleData.grid
+    : [];
 
   const gridSize = grid.length;
 
   const colLabels = Array.from(
     { length: gridSize },
-    (_, i) => String.fromCharCode(65 + i)
+    (_, i) => getColumnLabel(i)
   );
 
-  // Build a map of which words cover each cell.
+  /*
+   * Map each cell to the words that cover it.
+   *
+   * Example:
+   *
+   * "4,7": ["APPLE"]
+   *
+   * or for an overlap:
+   *
+   * "4,7": ["APPLE", "PEAR"]
+   */
   const cellWordMap: Record<string, string[]> = {};
 
-  solutionWords.forEach((word: any) => {
-    const cells = getWordCells(word);
+  solutionWords.forEach((wordData: any) => {
+    const startRow = Number(wordData?.startRow);
+    const startCol = Number(wordData?.startCol);
+    const endRow = Number(wordData?.endRow);
+    const endCol = Number(wordData?.endCol);
 
-    cells.forEach(([row, col]) => {
+    if (
+      !Number.isFinite(startRow) ||
+      !Number.isFinite(startCol) ||
+      !Number.isFinite(endRow) ||
+      !Number.isFinite(endCol) ||
+      !wordData?.word
+    ) {
+      return;
+    }
+
+    const minRow = Math.min(startRow, endRow);
+    const maxRow = Math.max(startRow, endRow);
+    const minCol = Math.min(startCol, endCol);
+    const maxCol = Math.max(startCol, endCol);
+
+    /*
+     * Word-search puzzles can be horizontal, vertical,
+     * or diagonal.
+     *
+     * The original implementation filled the entire rectangle,
+     * which is incorrect for diagonal words.
+     *
+     * We therefore calculate the actual row/column step.
+     */
+    const rowStep =
+      endRow === startRow
+        ? 0
+        : endRow > startRow
+          ? 1
+          : -1;
+
+    const colStep =
+      endCol === startCol
+        ? 0
+        : endCol > startCol
+          ? 1
+          : -1;
+
+    const distance = Math.max(
+      Math.abs(endRow - startRow),
+      Math.abs(endCol - startCol)
+    );
+
+    for (let step = 0; step <= distance; step++) {
+      const row = startRow + step * rowStep;
+      const col = startCol + step * colStep;
+
+      if (
+        row < 0 ||
+        col < 0 ||
+        row >= gridSize ||
+        col >= (grid[row]?.length || 0)
+      ) {
+        continue;
+      }
+
       const key = row + ',' + col;
 
       if (!cellWordMap[key]) {
         cellWordMap[key] = [];
       }
 
-      if (!cellWordMap[key].includes(word.word)) {
-        cellWordMap[key].push(word.word);
+      if (!cellWordMap[key].includes(wordData.word)) {
+        cellWordMap[key].push(wordData.word);
       }
-    });
+    }
   });
 
-  // Assign colors to each word.
+  /*
+   * Assign a color to every word.
+   */
   const wordColorMap: Record<string, number> = {};
 
-  solutionWords.forEach((word: any, index: number) => {
-    wordColorMap[word.word] =
-      index % WORD_COLORS.length;
-  });
+  solutionWords.forEach(
+    (wordData: any, index: number) => {
+      if (wordData?.word) {
+        wordColorMap[wordData.word] =
+          index % WORD_COLORS.length;
+      }
+    }
+  );
 
-  const getCellWords = (
-    row: number,
-    col: number
-  ): string[] => {
-    const key = row + ',' + col;
-    return cellWordMap[key] || [];
-  };
-
-  const hasOverlap = (
-    row: number,
-    col: number
-  ): boolean => {
-    return getCellWords(row, col).length > 1;
-  };
-
+  /*
+   * Get the color for a cell.
+   */
   const getCellColor = (
     row: number,
     col: number
   ) => {
-    const words = getCellWords(row, col);
+    const key = row + ',' + col;
+    const words = cellWordMap[key] || [];
 
     if (words.length === 0) {
       return {
@@ -667,13 +774,35 @@ function SolutionPageView({
       return WORD_COLORS[colorIndex];
     }
 
-    // Multiple words overlap on this cell.
+    /*
+     * Multiple words in the same cell = overlap.
+     */
     const overlapIndex = Math.min(
-      words.length - 2,
+      words.length - 1,
       overlapPatterns.length - 1
     );
 
     return overlapPatterns[overlapIndex];
+  };
+
+  const hasOverlap = (
+    row: number,
+    col: number
+  ): boolean => {
+    const key = row + ',' + col;
+
+    return (
+      (cellWordMap[key] || []).length > 1
+    );
+  };
+
+  const getOverlapWords = (
+    row: number,
+    col: number
+  ): string[] => {
+    const key = row + ',' + col;
+
+    return cellWordMap[key] || [];
   };
 
   return (
@@ -684,10 +813,10 @@ function SolutionPageView({
 
       {solutionWords.length > 0 ? (
         <div>
-          {/* Legend */}
+          {/* Color legend */}
           <div className="flex flex-wrap justify-center gap-2 mb-4">
             {solutionWords.map(
-              (word: any, index: number) => {
+              (wordData: any, index: number) => {
                 const colorIndex =
                   index % WORD_COLORS.length;
 
@@ -701,101 +830,104 @@ function SolutionPageView({
                       WORD_COLORS[colorIndex].border
                     }
                   >
-                    {word.word}
+                    {wordData.word}
                   </span>
                 );
               }
             )}
 
             <span className="px-2 py-1 text-xs font-medium rounded bg-gradient-to-r from-purple-200 to-pink-200 border border-purple-500">
-              Overlap
+              ? Overlap
             </span>
           </div>
 
-          {/* Solution Grid */}
+          {/* Solution grid */}
           {grid.length > 0 ? (
-            <div className="flex justify-center overflow-x-auto mb-4">
+            <div className="flex justify-center overflow-x-auto">
               <div>
-                {/* Column headers */}
+                {/* Column labels */}
                 <div className="flex">
                   <div className="w-6 h-6 flex items-center justify-center text-xs font-bold text-gray-400 flex-shrink-0" />
 
-                  {colLabels.map((label, idx) => (
-                    <div
-                      key={idx}
-                      className="w-8 h-6 flex items-center justify-center text-xs font-bold text-gray-400 flex-shrink-0"
-                    >
-                      {label}
-                    </div>
-                  ))}
+                  {colLabels.map(
+                    (label, idx) => (
+                      <div
+                        key={idx}
+                        className="w-8 h-6 flex items-center justify-center text-xs font-bold text-gray-400 flex-shrink-0"
+                      >
+                        {label}
+                      </div>
+                    )
+                  )}
                 </div>
 
                 {/* Grid */}
-                {grid.map(
-                  (row: string[], rowIndex: number) => (
-                    <div
-                      key={rowIndex}
-                      className="flex"
-                    >
-                      <div className="w-6 h-8 flex items-center justify-center text-xs font-bold text-gray-400 flex-shrink-0">
-                        {rowIndex + 1}
-                      </div>
-
-                      {row.map(
-                        (
-                          cell: string,
-                          colIndex: number
-                        ) => {
-                          const words = getCellWords(
-                            rowIndex,
-                            colIndex
-                          );
-
-                          const color = getCellColor(
-                            rowIndex,
-                            colIndex
-                          );
-
-                          const isOverlap =
-                            hasOverlap(
-                              rowIndex,
-                              colIndex
-                            );
-
-                          return (
-                            <div
-                              key={
-                                rowIndex +
-                                '-' +
-                                colIndex
-                              }
-                              className={
-                                'w-8 h-8 flex items-center justify-center text-sm font-mono border flex-shrink-0 relative ' +
-                                color.bg +
-                                ' ' +
-                                color.border
-                              }
-                              title={
-                                isOverlap
-                                  ? 'Overlap: ' +
-                                    words.join(' + ')
-                                  : words[0] || ''
-                              }
-                            >
-                              {cell}
-
-                              {isOverlap && (
-                                <span className="absolute -top-1 -right-1 text-[8px] text-purple-600 font-bold">
-                                  ?
-                                </span>
-                              )}
-                            </div>
-                          );
-                        }
-                      )}
+                {grid.map((row, i) => (
+                  <div
+                    key={i}
+                    className="flex"
+                  >
+                    {/* Row number */}
+                    <div className="w-6 h-8 flex items-center justify-center text-xs font-bold text-gray-400 flex-shrink-0">
+                      {i + 1}
                     </div>
-                  )
-                )}
+
+                    {row.map(
+                      (cell, j) => {
+                        const color =
+                          getCellColor(
+                            i,
+                            j
+                          );
+
+                        const isOverlap =
+                          hasOverlap(
+                            i,
+                            j
+                          );
+
+                        const overlapWords =
+                          getOverlapWords(
+                            i,
+                            j
+                          );
+
+                        return (
+                          <div
+                            key={
+                              i +
+                              '-' +
+                              j
+                            }
+                            className={
+                              'w-8 h-8 flex items-center justify-center text-sm font-mono border flex-shrink-0 relative ' +
+                              color.bg +
+                              ' ' +
+                              color.border
+                            }
+                            title={
+                              isOverlap
+                                ? 'Overlap: ' +
+                                  overlapWords.join(
+                                    ' + '
+                                  )
+                                : overlapWords[0] ||
+                                  ''
+                            }
+                          >
+                            {cell}
+
+                            {isOverlap && (
+                              <span className="absolute -top-1 -right-1 text-[8px] text-purple-600 font-bold">
+                                ?
+                              </span>
+                            )}
+                          </div>
+                        );
+                      }
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
           ) : (
@@ -803,57 +935,6 @@ function SolutionPageView({
               No puzzle grid available
             </div>
           )}
-
-          {/* Word Locations */}
-          <div className="max-w-md mx-auto space-y-2">
-            {solutionWords.map(
-              (word: any, index: number) => {
-                const colorIndex =
-                  index % WORD_COLORS.length;
-
-                const wordHasOverlap =
-                  Object.values(cellWordMap).some(
-                    (words) =>
-                      words.length > 1 &&
-                      words.includes(word.word)
-                  );
-
-                return (
-                  <div
-                    key={index}
-                    className={
-                      'flex justify-between items-center p-2 rounded border ' +
-                      WORD_COLORS[colorIndex].bg +
-                      ' ' +
-                      WORD_COLORS[colorIndex].border
-                    }
-                  >
-                    <span className="font-medium">
-                      {word.word}
-                    </span>
-
-                    <span className="text-sm text-gray-600">
-                      {String.fromCharCode(
-                        65 + word.startCol
-                      )}
-                      {word.startRow + 1}
-                      {' ? '}
-                      {String.fromCharCode(
-                        65 + word.endCol
-                      )}
-                      {word.endRow + 1}
-
-                      {wordHasOverlap && (
-                        <span className="ml-2 text-purple-600 text-xs">
-                          ?? overlaps
-                        </span>
-                      )}
-                    </span>
-                  </div>
-                );
-              }
-            )}
-          </div>
         </div>
       ) : (
         <div className="text-center text-gray-400 py-12">
@@ -862,4 +943,29 @@ function SolutionPageView({
       )}
     </div>
   );
+}
+
+/*
+ * Convert a zero-based column number to letters.
+ *
+ * 0  -> A
+ * 1  -> B
+ * ...
+ * 25 -> Z
+ * 26 -> AA
+ * 27 -> AB
+ */
+function getColumnLabel(index: number): string {
+  let label = '';
+  let value = index + 1;
+
+  while (value > 0) {
+    const remainder = (value - 1) % 26;
+    label =
+      String.fromCharCode(65 + remainder) +
+      label;
+    value = Math.floor((value - 1) / 26);
+  }
+
+  return label;
 }
