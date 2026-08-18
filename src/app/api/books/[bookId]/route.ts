@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+﻿import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
@@ -17,7 +17,10 @@ export async function GET(
     const { bookId } = await context.params;
 
     if (!bookId) {
-      return Response.json({ error: "Book ID is required" }, { status: 400 });
+      return Response.json(
+        { error: "Book ID is required" },
+        { status: 400 },
+      );
     }
 
     const book = await prisma.book.findUnique({
@@ -74,11 +77,17 @@ export async function GET(
     });
 
     if (!book) {
-      return Response.json({ error: "Book not found" }, { status: 404 });
+      return Response.json(
+        { error: "Book not found" },
+        { status: 404 },
+      );
     }
 
     if (book.userId !== session.user.id) {
-      return Response.json({ error: "Forbidden" }, { status: 403 });
+      return Response.json(
+        { error: "Forbidden" },
+        { status: 403 },
+      );
     }
 
     return Response.json({
@@ -90,7 +99,78 @@ export async function GET(
 
     return Response.json(
       {
-        error: error instanceof Error ? error.message : "Failed to fetch book",
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to fetch book",
+      },
+      { status: 500 },
+    );
+  }
+}
+
+export async function DELETE(
+  req: NextRequest,
+  context: { params: Promise<{ bookId: string }> },
+) {
+  try {
+    const session = await getServerSession(authOptions);
+
+    if (!session?.user?.id) {
+      return Response.json(
+        { error: "Unauthorized" },
+        { status: 401 },
+      );
+    }
+
+    const { bookId } = await context.params;
+
+    if (!bookId) {
+      return Response.json(
+        { error: "Book ID is required" },
+        { status: 400 },
+      );
+    }
+
+    const book = await prisma.book.findUnique({
+      where: { id: bookId },
+      select: {
+        id: true,
+        userId: true,
+      },
+    });
+
+    if (!book) {
+      return Response.json(
+        { error: "Book not found" },
+        { status: 404 },
+      );
+    }
+
+    if (book.userId !== session.user.id) {
+      return Response.json(
+        { error: "Forbidden" },
+        { status: 403 },
+      );
+    }
+
+    await prisma.book.delete({
+      where: { id: bookId },
+    });
+
+    return Response.json({
+      success: true,
+      message: "Book deleted successfully",
+    });
+  } catch (error: unknown) {
+    console.error("Error deleting book:", error);
+
+    return Response.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to delete book",
       },
       { status: 500 },
     );
