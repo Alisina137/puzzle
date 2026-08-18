@@ -1,6 +1,6 @@
 {
   "engines": {
-    "node": "20.x"
+    "node": "24.x"
   },
   "name": "puzzle",
   "version": "0.1.0",
