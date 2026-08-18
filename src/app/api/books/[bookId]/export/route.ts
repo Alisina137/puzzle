@@ -49,7 +49,7 @@ export async function POST(
     const result = await PDFGenerator.generateBookPDF(bookId, options);
 
     // Return PDF as file
-    return new Response(result.buffer, {
+    return new Response(new Uint8Array(result.buffer), {
       status: 200,
       headers: {
         "Content-Type": "application/pdf",

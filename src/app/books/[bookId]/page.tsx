@@ -3,7 +3,14 @@
 import { useParams, useRouter } from 'next/navigation';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { useEffect, useState } from 'react';
-import { Loader2, ArrowLeft, RefreshCw, Trash2, Download, FileText } from 'lucide-react';
+import {
+  Loader2,
+  ArrowLeft,
+  RefreshCw,
+  Trash2,
+  FileText,
+  Eye,
+} from 'lucide-react';
 import Link from 'next/link';
 import { GenerationProgress } from '@/components/generation/GenerationProgress';
 import { SortablePuzzleList } from '@/components/puzzle/SortablePuzzleList';
@@ -93,7 +100,6 @@ export default function BookPage() {
         throw new Error(error.error || 'Failed to export');
       }
 
-      // Download the PDF
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -114,11 +120,7 @@ export default function BookPage() {
   const handleDeleteBook = async () => {
     if (!book) return;
     
-    if (
-      !confirm(
-        `Are you sure you want to delete "${book.title}"? This will permanently remove all puzzles and cannot be undone.`,
-      )
-    ) {
+    if (!confirm(Are you sure you want to delete ""? This will permanently remove all puzzles and cannot be undone.)) {
       return;
     }
 
@@ -234,23 +236,32 @@ export default function BookPage() {
           </Link>
           <div className="flex items-center gap-2">
             {book.status === 'ready' && (
-              <button
-                onClick={handleExport}
-                disabled={isExporting}
-                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
-              >
-                {isExporting ? (
-                  <>
-                    <Loader2 size={18} className="animate-spin" />
-                    Generating PDF...
-                  </>
-                ) : (
-                  <>
-                    <FileText size={18} />
-                    Export PDF
-                  </>
-                )}
-              </button>
+              <>
+                <Link
+                  href={'/books/' + bookId + '/preview'}
+                  className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                >
+                  <Eye size={18} />
+                  Preview
+                </Link>
+                <button
+                  onClick={handleExport}
+                  disabled={isExporting}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+                >
+                  {isExporting ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <FileText size={18} />
+                      Export PDF
+                    </>
+                  )}
+                </button>
+              </>
             )}
             <button
               onClick={handleDeleteBook}
