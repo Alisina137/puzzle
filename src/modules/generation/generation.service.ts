@@ -1,10 +1,10 @@
 import { prisma } from "@/lib/prisma";
-import { WordSelectionService } from "@/modules/theme/word-selection.service.js";
-import { GridGenerator } from "@/modules/puzzle/grid-generator.js";
-import { WordPlacer } from "@/modules/puzzle/word-placer.js";
-import { PuzzleValidator } from "@/modules/puzzle/puzzle-validator.js";
-import { DuplicateDetector } from "@/modules/puzzle/duplicate-detector.js";
-import { SolutionGenerator } from "@/modules/puzzle/solution-generator.js";
+import { WordSelectionService } from "@/modules/theme/word-selection.service";
+import { GridGenerator } from "@/modules/puzzle/grid-generator";
+import { WordPlacer } from "@/modules/puzzle/word-placer";
+import { PuzzleValidator } from "@/modules/puzzle/puzzle-validator";
+import { DuplicateDetector } from "@/modules/puzzle/duplicate-detector";
+import { SolutionGenerator } from "@/modules/puzzle/solution-generator";
 import { Prisma } from "@prisma/client";
 
 export interface GenerationResult {

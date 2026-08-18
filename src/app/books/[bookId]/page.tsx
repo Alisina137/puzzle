@@ -3,14 +3,7 @@
 import { useParams, useRouter } from 'next/navigation';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { useEffect, useState } from 'react';
-import {
-  Loader2,
-  ArrowLeft,
-  RefreshCw,
-  Trash2,
-  FileText,
-  Eye,
-} from 'lucide-react';
+import { Loader2, ArrowLeft, RefreshCw, Trash2, FileText, Eye } from 'lucide-react';
 import Link from 'next/link';
 import { GenerationProgress } from '@/components/generation/GenerationProgress';
 import { SortablePuzzleList } from '@/components/puzzle/SortablePuzzleList';
@@ -120,7 +113,7 @@ export default function BookPage() {
   const handleDeleteBook = async () => {
     if (!book) return;
     
-    if (!confirm(Are you sure you want to delete ""? This will permanently remove all puzzles and cannot be undone.)) {
+    if (!confirm('Are you sure you want to delete "' + book.title + '"? This will permanently remove all puzzles and cannot be undone.')) {
       return;
     }
 

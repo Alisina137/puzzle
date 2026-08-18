@@ -8,7 +8,7 @@ import {
   bookIdSchema,
 } from "@/lib";
 import { authOptions } from "@/lib/auth";
-import { GenerationService } from "@/modules/generation/generation.service.js";
+import { GenerationService } from "@/modules/generation/generation.service";
 
 // Helper to verify book ownership
 async function verifyBookOwnership(bookId: string, userId: string) {
