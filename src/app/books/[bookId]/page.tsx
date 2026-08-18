@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useParams, useRouter } from 'next/navigation';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
@@ -8,12 +8,14 @@ import {
   ArrowLeft,
   RefreshCw,
   Trash2,
+  FileText,
   Eye,
 } from 'lucide-react';
 import Link from 'next/link';
 import { GenerationProgress } from '@/components/generation/GenerationProgress';
 import { SortablePuzzleList } from '@/components/puzzle/SortablePuzzleList';
 import { PreflightButton } from '@/components/pdf/PreflightButton';
+import { ExportsList } from '@/components/export/ExportsList';
 
 interface Book {
   id: string;
@@ -82,9 +84,7 @@ export default function BookPage() {
   }, [bookId, refreshKey]);
 
   const handleExport = async () => {
-    if (!book || isExporting) {
-      return;
-    }
+    if (!book || isExporting) return;
 
     setIsExporting(true);
 
@@ -101,30 +101,21 @@ export default function BookPage() {
             includeSolutions: true,
             solutionPlacement: 'back',
           }),
-        },
+        }
       );
 
       if (!response.ok) {
-        let message = 'Failed to export';
-
-        try {
-          const error = await response.json();
-          message = error.error || message;
-        } catch {
-          // Keep default error message.
-        }
-
-        throw new Error(message);
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to export');
       }
 
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
-
       const link = document.createElement('a');
 
       link.href = url;
       link.download =
-        book.title.replace(/[<>:"/\\|?*]+/g, '_') + '.pdf';
+        book.title.replace(/ /g, '_') + '.pdf';
 
       document.body.appendChild(link);
       link.click();
@@ -140,17 +131,15 @@ export default function BookPage() {
   };
 
   const handleDeleteBook = async () => {
-    if (!book) {
-      return;
-    }
+    if (!book) return;
 
-    const confirmed = confirm(
-      'Are you sure you want to delete "' +
-        book.title +
-        '"? This will permanently remove all puzzles and cannot be undone.',
-    );
-
-    if (!confirmed) {
+    if (
+      !confirm(
+        'Are you sure you want to delete "' +
+          book.title +
+          '"? This will permanently remove all puzzles and cannot be undone.'
+      )
+    ) {
       return;
     }
 
@@ -161,7 +150,7 @@ export default function BookPage() {
         '/api/books/' + bookId,
         {
           method: 'DELETE',
-        },
+        }
       );
 
       if (!response.ok) {
@@ -197,7 +186,7 @@ export default function BookPage() {
           body: JSON.stringify({
             order: puzzleIds,
           }),
-        },
+        }
       );
 
       if (!response.ok) {
@@ -213,16 +202,14 @@ export default function BookPage() {
 
   const handlePuzzleUpdate = (updatedPuzzle: any) => {
     setBook((prevBook) => {
-      if (!prevBook) {
-        return prevBook;
-      }
+      if (!prevBook) return prevBook;
 
-      const updatedBookPuzzles = prevBook.bookPuzzles.map(
-        (bookPuzzle) =>
-          bookPuzzle.id === updatedPuzzle.id
+      const updatedBookPuzzles =
+        prevBook.bookPuzzles.map((bp) =>
+          bp.id === updatedPuzzle.id
             ? updatedPuzzle
-            : bookPuzzle,
-      );
+            : bp
+        );
 
       return {
         ...prevBook,
@@ -281,7 +268,7 @@ export default function BookPage() {
             href="/books"
             className="text-blue-600 hover:underline mt-2 inline-block ml-4"
           >
-            ? Back to Books
+            ← Back to Books
           </Link>
         </div>
       </DashboardLayout>
@@ -291,7 +278,7 @@ export default function BookPage() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Header */}
+        {/* Page Header */}
         <div className="flex items-center justify-between flex-wrap gap-2">
           <Link
             href="/books"
@@ -304,24 +291,46 @@ export default function BookPage() {
           <div className="flex items-center gap-2 flex-wrap">
             {book.status === 'ready' && (
               <>
-                {/* Preview */}
                 <Link
-                  href={'/books/' + bookId + '/preview'}
+                  href={
+                    '/books/' +
+                    bookId +
+                    '/preview'
+                  }
                   className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
                 >
                   <Eye size={18} />
                   Preview
                 </Link>
 
-                {/* KDP Preflight Check */}
                 <PreflightButton
                   bookId={bookId}
                   onExport={handleExport}
                 />
+
+                <button
+                  onClick={handleExport}
+                  disabled={isExporting}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+                >
+                  {isExporting ? (
+                    <>
+                      <Loader2
+                        size={18}
+                        className="animate-spin"
+                      />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <FileText size={18} />
+                      Export PDF
+                    </>
+                  )}
+                </button>
               </>
             )}
 
-            {/* Delete */}
             <button
               onClick={handleDeleteBook}
               disabled={isDeleting}
@@ -373,20 +382,18 @@ export default function BookPage() {
                   setRefreshKey((prev) => prev + 1)
                 }
                 className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-                title="Refresh book"
+                type="button"
               >
                 <RefreshCw size={18} />
               </button>
             </div>
           </div>
 
-          {/* Book Statistics */}
           <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="bg-gray-50 rounded-lg p-4 text-center">
               <p className="text-2xl font-bold text-gray-800">
                 {book.puzzleCount}
               </p>
-
               <p className="text-sm text-gray-500">
                 Total Puzzles
               </p>
@@ -396,7 +403,6 @@ export default function BookPage() {
               <p className="text-2xl font-bold text-gray-800">
                 {book.bookPuzzles?.length || 0}
               </p>
-
               <p className="text-sm text-gray-500">
                 Generated
               </p>
@@ -406,7 +412,6 @@ export default function BookPage() {
               <p className="text-2xl font-bold text-gray-800">
                 {book.qualityScore || 'N/A'}
               </p>
-
               <p className="text-sm text-gray-500">
                 Quality Score
               </p>
@@ -419,7 +424,7 @@ export default function BookPage() {
 
               <p className="text-sm font-medium text-gray-700">
                 {new Date(
-                  book.createdAt,
+                  book.createdAt
                 ).toLocaleDateString()}
               </p>
             </div>
@@ -437,7 +442,7 @@ export default function BookPage() {
           />
         )}
 
-        {/* Puzzle List */}
+        {/* Puzzles Section */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-gray-800">
@@ -456,6 +461,15 @@ export default function BookPage() {
             onReorder={handleReorder}
             onPuzzleUpdate={handlePuzzleUpdate}
           />
+        </div>
+
+        {/* Exports Section */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <h2 className="text-lg font-semibold text-gray-800 mb-4">
+            Exports
+          </h2>
+
+          <ExportsList bookId={book.id} />
         </div>
       </div>
     </DashboardLayout>
