@@ -1,41 +1,71 @@
 import { NextRequest } from "next/server";
+import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
-import { apiResponse } from "@/lib/api-response";
 
 export async function GET(
   req: NextRequest,
-  context: { params: Promise<{ bookId: string }> },
+  context: { params: { bookId: string } },
 ) {
   try {
     const session = await getServerSession(authOptions);
 
     if (!session?.user?.id) {
-      return apiResponse.unauthorized();
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { bookId } = await context.params;
+    const { bookId } = context.params;
 
     if (!bookId) {
-      return apiResponse.badRequest("Book ID is required");
+      return Response.json({ error: "Book ID is required" }, { status: 400 });
     }
 
+    // Optimized: Select only needed fields
     const book = await prisma.book.findUnique({
-      where: {
-        id: bookId,
-      },
-      include: {
+      where: { id: bookId },
+      select: {
+        id: true,
+        userId: true,
+        title: true,
+        theme: true,
+        puzzleCount: true,
+        status: true,
+        qualityScore: true,
+        createdAt: true,
+
+        // Only select necessary puzzle data
         bookPuzzles: {
-          include: {
+          select: {
+            id: true,
+            position: true,
+            displayNumber: true,
+
             puzzle: {
-              include: {
-                versions: true,
+              select: {
+                id: true,
+                type: true,
+                difficulty: true,
+                qualityScore: true,
+                data: true,
               },
             },
-            puzzleVersion: true,
-            solution: true,
+
+            puzzleVersion: {
+              select: {
+                id: true,
+                versionNumber: true,
+                data: true,
+              },
+            },
+
+            solution: {
+              select: {
+                id: true,
+                data: true,
+              },
+            },
           },
+
           orderBy: {
             position: "asc",
           },
@@ -44,91 +74,23 @@ export async function GET(
     });
 
     if (!book) {
-      return apiResponse.notFound("Book not found");
+      return Response.json({ error: "Book not found" }, { status: 404 });
     }
 
     if (book.userId !== session.user.id) {
-      return apiResponse.forbidden(
-        "You do not have permission to view this book",
-      );
+      return Response.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    return apiResponse.success(book);
-  } catch (error) {
+    return Response.json({
+      success: true,
+      data: book,
+    });
+  } catch (error: any) {
     console.error("Error fetching book:", error);
 
-    return apiResponse.internalError(
-      error instanceof Error
-        ? error.message
-        : "Internal server error",
-    );
-  }
-}
-
-export async function DELETE(
-  req: NextRequest,
-  context: { params: Promise<{ bookId: string }> },
-) {
-  try {
-    const session = await getServerSession(authOptions);
-
-    if (!session?.user?.id) {
-      return apiResponse.unauthorized();
-    }
-
-    const { bookId } = await context.params;
-
-    if (!bookId) {
-      return apiResponse.badRequest("Book ID is required");
-    }
-
-    // Verify that the book exists and belongs to the current user
-    const book = await prisma.book.findUnique({
-      where: {
-        id: bookId,
-      },
-      select: {
-        id: true,
-        userId: true,
-      },
-    });
-
-    if (!book) {
-      return apiResponse.notFound("Book not found");
-    }
-
-    if (book.userId !== session.user.id) {
-      return apiResponse.forbidden(
-        "You do not have permission to delete this book",
-      );
-    }
-
-    /*
-     * Delete the book.
-     *
-     * bookPuzzles and their related records should be removed
-     * through the database's configured cascade relationships.
-     *
-     * The actual Puzzle records are NOT deleted here because
-     * they may be independent/shared records.
-     */
-    await prisma.book.delete({
-      where: {
-        id: bookId,
-      },
-    });
-
-    return apiResponse.success({
-      message: "Book deleted successfully",
-      bookId,
-    });
-  } catch (error) {
-    console.error("Error deleting book:", error);
-
-    return apiResponse.internalError(
-      error instanceof Error
-        ? error.message
-        : "Failed to delete book",
+    return Response.json(
+      { error: error.message || "Failed to fetch book" },
+      { status: 500 },
     );
   }
 }
