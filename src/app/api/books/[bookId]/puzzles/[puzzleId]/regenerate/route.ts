@@ -55,10 +55,10 @@ function getPuzzleData(data: unknown): StoredPuzzleData | null {
 export async function POST(
   _req: NextRequest,
   context: {
-    params: {
+    params: Promise<{
       bookId: string;
       puzzleId: string;
-    };
+    }>;
   },
 ) {
   try {
@@ -70,7 +70,7 @@ export async function POST(
       return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { bookId, puzzleId } = context.params;
+    const { bookId, puzzleId } = await context.params;
 
     console.log("Book ID:", bookId);
     console.log("Puzzle ID:", puzzleId);

@@ -5,7 +5,7 @@ import { authOptions } from "@/lib/auth";
 
 export async function GET(
   req: NextRequest,
-  context: { params: { bookId: string } },
+  context: { params: Promise<{ bookId: string }> },
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -14,15 +14,16 @@ export async function GET(
       return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { bookId } = context.params;
+    const { bookId } = await context.params;
 
     if (!bookId) {
       return Response.json({ error: "Book ID is required" }, { status: 400 });
     }
 
-    // Optimized: Select only needed fields
     const book = await prisma.book.findUnique({
-      where: { id: bookId },
+      where: {
+        id: bookId,
+      },
       select: {
         id: true,
         userId: true,
@@ -33,7 +34,6 @@ export async function GET(
         qualityScore: true,
         createdAt: true,
 
-        // Only select necessary puzzle data
         bookPuzzles: {
           select: {
             id: true,
@@ -85,11 +85,13 @@ export async function GET(
       success: true,
       data: book,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error fetching book:", error);
 
     return Response.json(
-      { error: error.message || "Failed to fetch book" },
+      {
+        error: error instanceof Error ? error.message : "Failed to fetch book",
+      },
       { status: 500 },
     );
   }

@@ -36,10 +36,9 @@ async function verifyBookOwnership(bookId: string, userId: string) {
 }
 
 // GET /api/books/[bookId]/progress
-// Get generation progress
 async function getProgress(
   req: Request,
-  context: { params: Record<string, string> },
+  context: { params: Promise<{ bookId: string }> },
 ) {
   const session = await getServerSession(authOptions);
 
@@ -47,16 +46,14 @@ async function getProgress(
     return apiResponse.unauthorized("Please sign in");
   }
 
-  const bookId = context.params.bookId;
+  const { bookId } = await context.params;
 
-  // Validate book ID
   const idValidation = validateSchema(bookIdSchema, { bookId });
 
   if (!idValidation.success) {
     return apiResponse.badRequest("Invalid book ID", idValidation.errors);
   }
 
-  // Verify ownership
   const ownership = await verifyBookOwnership(bookId, session.user.id);
 
   if (ownership.error) {
@@ -76,10 +73,9 @@ async function getProgress(
 }
 
 // DELETE /api/books/[bookId]/progress
-// Cancel generation
 async function cancelGeneration(
   req: Request,
-  context: { params: Record<string, string> },
+  context: { params: Promise<{ bookId: string }> },
 ) {
   const session = await getServerSession(authOptions);
 
@@ -87,16 +83,14 @@ async function cancelGeneration(
     return apiResponse.unauthorized("Please sign in");
   }
 
-  const bookId = context.params.bookId;
+  const { bookId } = await context.params;
 
-  // Validate book ID
   const idValidation = validateSchema(bookIdSchema, { bookId });
 
   if (!idValidation.success) {
     return apiResponse.badRequest("Invalid book ID", idValidation.errors);
   }
 
-  // Verify ownership
   const ownership = await verifyBookOwnership(bookId, session.user.id);
 
   if (ownership.error) {

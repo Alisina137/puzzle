@@ -35,7 +35,7 @@ async function verifyBookOwnership(bookId: string, userId: string) {
 // GET /api/books/[bookId]/puzzles/[puzzleId]
 async function getPuzzle(
   req: Request,
-  context: { params: { bookId: string; puzzleId: string } },
+  context: { params: Promise<{ bookId: string; puzzleId: string }> },
 ) {
   const session = await getServerSession(authOptions);
 
@@ -43,7 +43,7 @@ async function getPuzzle(
     return apiResponse.unauthorized("Please sign in");
   }
 
-  const { bookId, puzzleId } = context.params;
+  const { bookId, puzzleId } = await context.params;
 
   // Validate book ID
   const bookValidation = validateSchema(bookIdSchema, { bookId });
@@ -93,7 +93,7 @@ async function getPuzzle(
 // DELETE /api/books/[bookId]/puzzles/[puzzleId]
 async function deletePuzzle(
   req: Request,
-  context: { params: { bookId: string; puzzleId: string } },
+  context: { params: Promise<{ bookId: string; puzzleId: string }> },
 ) {
   const session = await getServerSession(authOptions);
 
@@ -101,7 +101,7 @@ async function deletePuzzle(
     return apiResponse.unauthorized("Please sign in");
   }
 
-  const { bookId, puzzleId } = context.params;
+  const { bookId, puzzleId } = await context.params;
 
   // Validate book ID
   const bookValidation = validateSchema(bookIdSchema, { bookId });

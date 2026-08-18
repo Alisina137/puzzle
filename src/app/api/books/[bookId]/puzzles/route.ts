@@ -1,5 +1,4 @@
 ﻿import { NextRequest } from "next/server";
-
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
@@ -11,15 +10,20 @@ import {
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 
-// Helper to verify book ownership
 async function verifyBookOwnership(bookId: string, userId: string) {
   const book = await prisma.book.findUnique({
-    where: { id: bookId },
-    select: { userId: true },
+    where: {
+      id: bookId,
+    },
+    select: {
+      userId: true,
+    },
   });
 
   if (!book) {
-    return { error: apiResponse.notFound("Book not found") };
+    return {
+      error: apiResponse.notFound("Book not found"),
+    };
   }
 
   if (book.userId !== userId) {
@@ -30,13 +34,14 @@ async function verifyBookOwnership(bookId: string, userId: string) {
     };
   }
 
-  return { book };
+  return {
+    book,
+  };
 }
 
-// GET /api/books/[bookId]/puzzles
 async function getPuzzles(
-  req: Request,
-  context: { params: { bookId: string } },
+  req: NextRequest,
+  context: { params: Promise<{ bookId: string }> },
 ) {
   const session = await getServerSession(authOptions);
 
@@ -44,7 +49,7 @@ async function getPuzzles(
     return apiResponse.unauthorized("Please sign in");
   }
 
-  const { bookId } = context.params;
+  const { bookId } = await context.params;
 
   const idValidation = validateSchema(bookIdSchema, { bookId });
 
@@ -59,7 +64,9 @@ async function getPuzzles(
   }
 
   const bookPuzzles = await prisma.bookPuzzle.findMany({
-    where: { bookId },
+    where: {
+      bookId,
+    },
     include: {
       puzzle: true,
       puzzleVersion: true,
@@ -76,10 +83,9 @@ async function getPuzzles(
   });
 }
 
-// POST /api/books/[bookId]/puzzles
 async function createPuzzle(
-  req: Request,
-  context: { params: { bookId: string } },
+  req: NextRequest,
+  context: { params: Promise<{ bookId: string }> },
 ) {
   const session = await getServerSession(authOptions);
 
@@ -87,7 +93,7 @@ async function createPuzzle(
     return apiResponse.unauthorized("Please sign in");
   }
 
-  const { bookId } = context.params;
+  const { bookId } = await context.params;
 
   const idValidation = validateSchema(bookIdSchema, { bookId });
 
@@ -102,7 +108,9 @@ async function createPuzzle(
   }
 
   const book = await prisma.book.findUnique({
-    where: { id: bookId },
+    where: {
+      id: bookId,
+    },
   });
 
   if (!book) {
@@ -135,7 +143,9 @@ async function createPuzzle(
   });
 
   const existingCount = await prisma.bookPuzzle.count({
-    where: { bookId },
+    where: {
+      bookId,
+    },
   });
 
   const bookPuzzle = await prisma.bookPuzzle.create({

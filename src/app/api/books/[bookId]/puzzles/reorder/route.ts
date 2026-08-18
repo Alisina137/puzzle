@@ -5,7 +5,7 @@ import { authOptions } from "@/lib/auth";
 
 export async function PATCH(
   req: NextRequest,
-  context: { params: { bookId: string } },
+  context: { params: Promise<{ bookId: string }> },
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -14,7 +14,7 @@ export async function PATCH(
       return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { bookId } = context.params;
+    const { bookId } = await context.params;
 
     if (!bookId) {
       return Response.json({ error: "Book ID is required" }, { status: 400 });

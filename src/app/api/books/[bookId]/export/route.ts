@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 
 export async function POST(
   req: NextRequest,
-  context: { params: { bookId: string } },
+  context: { params: Promise<{ bookId: string }> },
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -15,7 +15,7 @@ export async function POST(
       return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { bookId } = context.params;
+    const { bookId } = await context.params;
     const body = await req.json();
 
     // Verify book ownership

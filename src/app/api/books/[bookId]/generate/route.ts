@@ -38,7 +38,7 @@ async function verifyBookOwnership(bookId: string, userId: string) {
 // POST /api/books/[bookId]/generate
 async function generateBook(
   req: NextRequest,
-  context: { params: { bookId: string } },
+  context: { params: Promise<{ bookId: string }> },
 ) {
   const session = await getServerSession(authOptions);
 
@@ -46,28 +46,24 @@ async function generateBook(
     return apiResponse.unauthorized("Please sign in");
   }
 
-  const { bookId } = context.params;
+  const { bookId } = await context.params;
 
-  // Validate book ID
   const idValidation = validateSchema(bookIdSchema, { bookId });
 
   if (!idValidation.success) {
     return apiResponse.badRequest("Invalid book ID", idValidation.errors);
   }
 
-  // Verify ownership
   const ownership = await verifyBookOwnership(bookId, session.user.id);
 
   if (ownership.error) {
     return ownership.error;
   }
 
-  // Check if book is already generating
   if (ownership.book.status === "generating") {
     return apiResponse.badRequest("Book is already being generated");
   }
 
-  // Check if book already has generated puzzles
   if (ownership.book.status === "ready") {
     return apiResponse.badRequest("Book already has generated puzzles");
   }
