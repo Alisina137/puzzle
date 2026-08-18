@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState } from "react";
 import {
   CheckCircle,
   XCircle,
@@ -8,14 +8,15 @@ import {
   Info,
   Loader2,
   X,
-} from 'lucide-react';
+} from "lucide-react";
+import { toast } from "sonner";
 
 interface PreflightCheck {
   name: string;
   passed: boolean;
   message?: string;
   details?: string;
-  severity: 'error' | 'warning' | 'info';
+  severity: "error" | "warning" | "info";
 }
 
 interface PreflightResult {
@@ -37,13 +38,9 @@ interface PreflightButtonProps {
   onExport?: () => void;
 }
 
-export function PreflightButton({
-  bookId,
-  onExport,
-}: PreflightButtonProps) {
+export function PreflightButton({ bookId, onExport }: PreflightButtonProps) {
   const [isRunning, setIsRunning] = useState(false);
-  const [result, setResult] =
-    useState<PreflightResult | null>(null);
+  const [result, setResult] = useState<PreflightResult | null>(null);
   const [showResults, setShowResults] = useState(false);
 
   useEffect(() => {
@@ -52,70 +49,48 @@ export function PreflightButton({
     }
 
     const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
+      if (event.key === "Escape") {
         setShowResults(false);
       }
     };
 
-    document.addEventListener('keydown', handleEscape);
+    document.addEventListener("keydown", handleEscape);
 
     return () => {
-      document.removeEventListener('keydown', handleEscape);
+      document.removeEventListener("keydown", handleEscape);
     };
   }, [showResults]);
 
   const runPreflight = async () => {
-    if (isRunning) {
-      return;
-    }
+    const toastId = toast.loading("Running preflight checks...");
 
     setIsRunning(true);
     setResult(null);
-    setShowResults(false);
 
     try {
-      const response = await fetch(
-        '/api/books/' + bookId + '/preflight',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        },
-      );
+      const response = await fetch("/api/books/" + bookId + "/preflight", {
+        method: "POST",
+      });
 
       if (!response.ok) {
-        let message = 'Failed to run preflight checks';
-
-        try {
-          const errorData = await response.json();
-          message = errorData.error || message;
-        } catch {
-          // Keep default error message.
-        }
-
-        throw new Error(message);
+        const error = await response.json();
+        throw new Error(error.error || "Failed to run preflight");
       }
 
       const data = await response.json();
-
-      if (!data?.data) {
-        throw new Error(
-          'Preflight service returned an invalid response',
-        );
-      }
-
       setResult(data.data);
       setShowResults(true);
-    } catch (error: unknown) {
-      console.error('Preflight error:', error);
 
-      const message =
-        error instanceof Error
-          ? error.message
-          : 'Failed to run preflight checks';
-
-      alert(message);
+      toast.dismiss(toastId);
+      if (data.data.passed) {
+        toast.success("Preflight checks passed! ✅");
+      } else {
+        toast.warning("Preflight checks found issues ⚠️");
+      }
+    } catch (error: any) {
+      console.error("Preflight error:", error);
+      toast.dismiss(toastId);
+      toast.error(error.message || "Failed to run preflight checks");
     } finally {
       setIsRunning(false);
     }
@@ -144,16 +119,13 @@ export function PreflightButton({
       );
     }
 
-    if (check.severity === 'error') {
+    if (check.severity === "error") {
       return (
-        <XCircle
-          size={16}
-          className="text-red-500 flex-shrink-0 mt-0.5"
-        />
+        <XCircle size={16} className="text-red-500 flex-shrink-0 mt-0.5" />
       );
     }
 
-    if (check.severity === 'warning') {
+    if (check.severity === "warning") {
       return (
         <AlertCircle
           size={16}
@@ -162,28 +134,23 @@ export function PreflightButton({
       );
     }
 
-    return (
-      <Info
-        size={16}
-        className="text-blue-500 flex-shrink-0 mt-0.5"
-      />
-    );
+    return <Info size={16} className="text-blue-500 flex-shrink-0 mt-0.5" />;
   };
 
   const getStatusColor = (check: PreflightCheck) => {
     if (check.passed) {
-      return 'border-green-200 bg-green-50';
+      return "border-green-200 bg-green-50";
     }
 
-    if (check.severity === 'error') {
-      return 'border-red-200 bg-red-50';
+    if (check.severity === "error") {
+      return "border-red-200 bg-red-50";
     }
 
-    if (check.severity === 'warning') {
-      return 'border-yellow-200 bg-yellow-50';
+    if (check.severity === "warning") {
+      return "border-yellow-200 bg-yellow-50";
     }
 
-    return 'border-blue-200 bg-blue-50';
+    return "border-blue-200 bg-blue-50";
   };
 
   return (
@@ -196,10 +163,7 @@ export function PreflightButton({
       >
         {isRunning ? (
           <>
-            <Loader2
-              size={18}
-              className="animate-spin"
-            />
+            <Loader2 size={18} className="animate-spin" />
             Checking...
           </>
         ) : (
@@ -233,9 +197,7 @@ export function PreflightButton({
                   Preflight Results
                 </h3>
 
-                <p className="text-sm text-gray-500">
-                  KDP readiness check
-                </p>
+                <p className="text-sm text-gray-500">KDP readiness check</p>
               </div>
 
               <button
@@ -244,10 +206,7 @@ export function PreflightButton({
                 className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
                 aria-label="Close preflight results"
               >
-                <X
-                  size={20}
-                  className="text-gray-400"
-                />
+                <X size={20} className="text-gray-400" />
               </button>
             </div>
 
@@ -258,20 +217,18 @@ export function PreflightButton({
                 <div className="flex items-center gap-3">
                   <span
                     className={
-                      'px-3 py-1 text-sm rounded-full ' +
+                      "px-3 py-1 text-sm rounded-full " +
                       (result.passed
-                        ? 'bg-green-100 text-green-700'
-                        : 'bg-red-100 text-red-700')
+                        ? "bg-green-100 text-green-700"
+                        : "bg-red-100 text-red-700")
                     }
                   >
-                    {result.passed
-                      ? 'PASSED'
-                      : 'FAILED'}
+                    {result.passed ? "PASSED" : "FAILED"}
                   </span>
 
                   <span className="text-sm text-gray-500">
-                    {result.summary.passedChecks}/
-                    {result.summary.totalChecks} passed
+                    {result.summary.passedChecks}/{result.summary.totalChecks}{" "}
+                    passed
                   </span>
                 </div>
 
@@ -284,8 +241,7 @@ export function PreflightButton({
 
                   {result.summary.warningsCount > 0 && (
                     <span className="text-yellow-500">
-                      {result.summary.warningsCount}{' '}
-                      warnings
+                      {result.summary.warningsCount} warnings
                     </span>
                   )}
                 </div>
@@ -296,13 +252,9 @@ export function PreflightButton({
                 {result.checks.length > 0 ? (
                   result.checks.map((check, index) => (
                     <div
-                      key={
-                        check.name +
-                        '-' +
-                        index
-                      }
+                      key={check.name + "-" + index}
                       className={
-                        'flex items-start gap-3 p-3 rounded-lg border ' +
+                        "flex items-start gap-3 p-3 rounded-lg border " +
                         getStatusColor(check)
                       }
                     >
@@ -316,21 +268,19 @@ export function PreflightButton({
 
                           <span
                             className={
-                              'text-xs px-2 py-0.5 rounded ' +
+                              "text-xs px-2 py-0.5 rounded " +
                               (check.passed
-                                ? 'bg-green-100 text-green-700'
-                                : check.severity ===
-                                    'warning'
-                                  ? 'bg-yellow-100 text-yellow-700'
-                                  : 'bg-red-100 text-red-700')
+                                ? "bg-green-100 text-green-700"
+                                : check.severity === "warning"
+                                  ? "bg-yellow-100 text-yellow-700"
+                                  : "bg-red-100 text-red-700")
                             }
                           >
                             {check.passed
-                              ? 'Passed'
-                              : check.severity ===
-                                  'warning'
-                                ? 'Warning'
-                                : 'Failed'}
+                              ? "Passed"
+                              : check.severity === "warning"
+                                ? "Warning"
+                                : "Failed"}
                           </span>
                         </div>
 

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { RefreshCw, Trash2, Eye, Loader2, GripVertical } from "lucide-react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { toast } from "sonner";
 
 interface PuzzleCardProps {
   puzzle: {
@@ -67,6 +68,8 @@ export function PuzzleCard({
   const handleRegenerate = async () => {
     if (isRegenerating) return;
 
+    const toastId = toast.loading("Regenerating puzzle...");
+
     setIsRegenerating(true);
     setError(null);
 
@@ -87,17 +90,20 @@ export function PuzzleCard({
         throw new Error(result.error || "Failed to regenerate puzzle");
       }
 
-      // Update the local puzzle state with the new data
       const updatedPuzzle = result.data.bookPuzzle;
       setCurrentPuzzle(updatedPuzzle);
 
-      // Notify parent component if needed
       if (onUpdate) {
         onUpdate(updatedPuzzle);
       }
+
+      toast.dismiss(toastId);
+      toast.success("Puzzle regenerated successfully! 🔄");
     } catch (err: any) {
       setError(err.message || "Failed to regenerate puzzle");
       console.error("Regeneration error:", err);
+      toast.dismiss(toastId);
+      toast.error(err.message || "Failed to regenerate puzzle");
     } finally {
       setIsRegenerating(false);
     }

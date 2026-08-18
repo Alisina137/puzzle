@@ -12,6 +12,7 @@ import {
 import { useEffect, useState } from 'react';
 import { BookCardSkeleton } from '@/components/ui/Skeleton';
 import { Pagination } from '@/components/ui/Pagination';
+import { toast } from "sonner";
 
 interface Book {
   id: string;
@@ -66,79 +67,35 @@ export default function BooksPage() {
     fetchBooks();
   }, []);
 
-  const handleDeleteBook = async (
-    bookId: string,
-    bookTitle: string
-  ) => {
-    const confirmed = window.confirm(
-      'Are you sure you want to delete "' +
-        bookTitle +
-        '"?\n\nThis action cannot be undone.'
-    );
-
-    if (!confirmed) {
+  const handleDeleteBook = async (bookId: string, bookTitle: string) => {
+    if (
+      !confirm(
+        `Are you sure you want to delete "${bookTitle}"? This action cannot be undone.`,
+      )
+    ) {
       return;
     }
 
-    setDeletingBookId(bookId);
+    const toastId = toast.loading("Deleting book...");
 
+    setDeletingBookId(bookId);
     try {
-      const response = await fetch('/api/books/' + bookId, {
-        method: 'DELETE',
+      const response = await fetch("/api/books/" + bookId, {
+        method: "DELETE",
       });
 
-      if (response.status === 401) {
-        window.location.href = '/login';
-        return;
-      }
-
-      if (response.status === 403) {
-        throw new Error(
-          'You do not have permission to delete this book.'
-        );
-      }
-
-      if (response.status === 404) {
-        throw new Error('Book not found.');
-      }
-
       if (!response.ok) {
-        const result = await response.json().catch(() => null);
-
-        throw new Error(
-          result?.error || 'Failed to delete book'
-        );
+        throw new Error("Failed to delete book");
       }
 
-      // Remove the book immediately from local state.
-      setBooks((currentBooks) =>
-        currentBooks.filter((book) => book.id !== bookId)
-      );
+      toast.dismiss(toastId);
+      toast.success("Book deleted successfully! 🗑️");
 
-      setTotalBooks((currentTotal) =>
-        Math.max(0, currentTotal - 1)
-      );
-
-      // Calculate whether the current page still exists.
-      const remainingBooks = books.length - 1;
-
-      const newTotalPages = Math.max(
-        1,
-        Math.ceil(remainingBooks / PAGE_SIZE)
-      );
-
-      if (currentPage > newTotalPages) {
-        setCurrentPage(newTotalPages);
-      }
+      await fetchBooks();
     } catch (error) {
-      console.error('Error deleting book:', error);
-
-      const message =
-        error instanceof Error
-          ? error.message
-          : 'Failed to delete book. Please try again.';
-
-      window.alert(message);
+      console.error("Error deleting book:", error);
+      toast.dismiss(toastId);
+      toast.error("Failed to delete book. Please try again.");
     } finally {
       setDeletingBookId(null);
     }
