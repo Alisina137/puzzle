@@ -1,8 +1,8 @@
-import { NextRequest } from 'next/server';
+﻿import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { ExportService } from '@/modules/export/export.service.js';
+import { ExportService } from '@/modules/export/export.service';
 
 // GET /api/exports/[exportId]/status - Get export status
 export async function GET(

@@ -1,5 +1,5 @@
 ﻿import { prisma } from "@/lib/prisma";
-import { PDFGenerator } from "@/modules/pdf/pdf-generator.js";
+import { PDFGenerator } from "@/modules/pdf/pdf-generator";
 import fs from "fs";
 import path from "path";
 
