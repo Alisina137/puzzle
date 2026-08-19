@@ -66,7 +66,22 @@ export const generationWorker = new Worker<GenerationJobData>(
         "  Generated: " + result.generatedPuzzles + "/" + result.totalPuzzles,
       );
       console.log("  Failed: " + result.failedPuzzles);
-      console.log("[Worker] Generation completed successfully");
+
+      if (result.errors.length > 0) {
+        console.error("[Worker] Generation errors:");
+        for (const error of result.errors) {
+          console.error("  - " + error);
+        }
+      }
+
+      if (result.warnings.length > 0) {
+        console.warn("[Worker] Generation warnings:");
+        for (const warning of result.warnings) {
+          console.warn("  - " + warning);
+        }
+      }
+
+      console.log("[Worker] Generation completed");
 
       return result;
     } catch (error: any) {
