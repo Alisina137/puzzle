@@ -12,6 +12,10 @@ const nextConfig = {
   output: "standalone",
 
   compress: true,
+
+  experimental: {
+    serverComponentsExternalPackages: ["pdfkit"],
+  },
 };
 
 export default nextConfig;
