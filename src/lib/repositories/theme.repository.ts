@@ -6,6 +6,7 @@ export const themeRepository = {
     return prisma.theme.findMany({
       include: {
         words: true,
+        category: true,
       },
     });
   },
@@ -16,6 +17,7 @@ export const themeRepository = {
       where: { name },
       include: {
         words: true,
+        category: true,
       },
     });
   },
@@ -29,11 +31,11 @@ export const themeRepository = {
   },
 
   // Create a custom theme
-  async createCustom(data: { name: string; category?: string; words: string[] }) {
+  async createCustom(data: { name: string; categoryId?: string; words: string[] }) {
     return prisma.theme.create({
       data: {
         name: data.name,
-        category: data.category,
+        categoryId: data.categoryId,
         isCustom: true,
         wordCount: data.words.length,
         words: {
