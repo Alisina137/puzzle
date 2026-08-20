@@ -39,6 +39,7 @@
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.0",
     "concurrently": "^8.2.2",
+    "docx": "^9.7.1",
     "dotenv": "^17.4.2",
     "framer-motion": "^13.1.0",
     "iconv-lite": "^0.7.3",
