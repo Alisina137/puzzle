@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { Queue, Worker, Job } from "bullmq";
 import { redisConnection, isRedisConfigured } from "@/lib/redis";
 

@@ -14,6 +14,8 @@ const createBookSchema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters').max(255, 'Title must be less than 255 characters'),
   puzzleCount: z.number().int().min(1, 'Must have at least 1 puzzle').max(500, 'Maximum 500 puzzles per book'),
   theme: z.string().min(1, 'Please select a theme'),
+  targetAudience: z.string().min(1, 'Please select a target audience'),
+  difficultyLevel: z.string().min(1, 'Please select a difficulty level'),
 });
 
 type CreateBookFormData = z.infer<typeof createBookSchema>;
@@ -24,6 +26,21 @@ const themes = [
   { value: 'travel', label: 'Travel' },
   { value: 'food', label: 'Food' },
   { value: 'sports', label: 'Sports' },
+];
+
+const audiences = [
+  { value: 'Children', label: '👶 Children' },
+  { value: 'Teenagers', label: '🧑 Teenagers' },
+  { value: 'Adults', label: '👨 Adults' },
+  { value: 'Seniors', label: '👴 Seniors' },
+  { value: 'PuzzleEnthusiasts', label: '🧩 Puzzle Enthusiasts' },
+];
+
+const difficultyLevels = [
+  { value: 'Easy', label: '🟢 Easy' },
+  { value: 'Medium', label: '🟡 Medium' },
+  { value: 'Hard', label: '🔴 Hard' },
+  { value: 'Expert', label: '⚫ Expert' },
 ];
 
 const puzzleCountPresets = [10, 25, 50, 100, 200];
@@ -46,6 +63,8 @@ export default function CreateBookPage() {
       title: '',
       puzzleCount: 50,
       theme: '',
+      targetAudience: '',
+      difficultyLevel: '',
     },
   });
 
@@ -65,6 +84,8 @@ export default function CreateBookPage() {
           title: data.title,
           puzzleCount: data.puzzleCount,
           theme: data.theme,
+          targetAudience: data.targetAudience,
+          difficultyLevel: data.difficultyLevel,
         }),
       });
 
@@ -79,7 +100,7 @@ export default function CreateBookPage() {
       }
 
       toast.dismiss(toastId);
-      toast.success('Book created successfully! ?? Generation started.');
+      toast.success('Book created successfully! 🎉 Generation started.');
       
       router.push('/dashboard');
     } catch (error) {
@@ -145,7 +166,7 @@ export default function CreateBookPage() {
                     key={preset}
                     type="button"
                     onClick={() => setValue("puzzleCount", preset)}
-                    className="px-3 py-1 text-sm rounded-full transition-colors"
+                    className="px-3 py-1 text-sm rounded-full border border-gray-300 hover:border-blue-500 hover:bg-blue-50 transition-colors"
                   >
                     {preset}
                   </button>
@@ -194,6 +215,54 @@ export default function CreateBookPage() {
               )}
             </div>
 
+            {/* Target Audience */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Target Audience <span className="text-red-500">*</span>
+              </label>
+              <select
+                {...register("targetAudience")}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                disabled={isSubmitting}
+              >
+                <option value="">Select audience...</option>
+                {audiences.map((audience) => (
+                  <option key={audience.value} value={audience.value}>
+                    {audience.label}
+                  </option>
+                ))}
+              </select>
+              {errors.targetAudience && (
+                <p className="text-red-500 text-sm mt-1">
+                  {errors.targetAudience.message}
+                </p>
+              )}
+            </div>
+
+            {/* Difficulty Level */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Difficulty Level <span className="text-red-500">*</span>
+              </label>
+              <select
+                {...register("difficultyLevel")}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                disabled={isSubmitting}
+              >
+                <option value="">Select difficulty...</option>
+                {difficultyLevels.map((level) => (
+                  <option key={level.value} value={level.value}>
+                    {level.label}
+                  </option>
+                ))}
+              </select>
+              {errors.difficultyLevel && (
+                <p className="text-red-500 text-sm mt-1">
+                  {errors.difficultyLevel.message}
+                </p>
+              )}
+            </div>
+
             {/* Submit Button */}
             <button
               type="submit"
@@ -221,15 +290,10 @@ export default function CreateBookPage() {
             What happens next?
           </h3>
           <ul className="text-sm text-blue-700 space-y-1">
-            <li>? Your book will be created and queued for generation</li>
-            <li>? Puzzles will be generated in the background</li>
-            <li>
-              ? You will be redirected to the dashboard where you can track
-              progress
-            </li>
-            <li>
-              ? Once complete, you can review, regenerate, and reorder puzzles
-            </li>
+            <li>📚 Your book will be created and queued for generation</li>
+            <li>🧩 Puzzles will be generated in the background</li>
+            <li>📊 You will be redirected to the dashboard where you can track progress</li>
+            <li>✅ Once complete, you can review, regenerate, and reorder puzzles</li>
           </ul>
         </div>
       </div>
