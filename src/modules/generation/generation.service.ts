@@ -16,6 +16,7 @@ export interface GenerationResult {
   totalAttempts: number;
   errors: string[];
   warnings: string[];
+  regeneratedPuzzles: number;
 }
 
 export class GenerationService {
@@ -31,6 +32,7 @@ export class GenerationService {
       totalAttempts: 0,
       errors: [],
       warnings: [],
+      regeneratedPuzzles: 0,
     };
 
     try {
@@ -69,131 +71,158 @@ export class GenerationService {
       }
 
       const words = wordResult.words;
+      const allFingerprints: any[] = [];
+      const targetDifficulty = book.difficultyLevel || "Medium";
 
       // Generate each puzzle
-      const allFingerprints: any[] = [];
-
       for (let i = 0; i < book.puzzleCount; i++) {
-        try {
-          // Generate grid
-          const gridResult = GridGenerator.generate({ difficulty: "medium" });
-          const grid = gridResult.grid;
+        let puzzleGenerated = false;
+        let attempts = 0;
+        const maxRegenerationAttempts = 5;
 
-          // Place words
-          const placement = WordPlacer.placeWords(grid, words, {
-            maxAttempts: 10,
-          });
+        while (!puzzleGenerated && attempts < maxRegenerationAttempts) {
+          attempts++;
+          try {
+            // Generate grid
+            const gridResult = GridGenerator.generate({ difficulty: "medium" });
+            const grid = gridResult.grid;
 
-          result.totalAttempts += placement.attempts;
+            // Place words
+            const placement = WordPlacer.placeWords(grid, words, {
+              maxAttempts: 10,
+            });
 
-          // Track failed words
-          if (placement.failedWords.length > 0) {
-            result.warnings.push(
-              "Puzzle " +
-                (i + 1) +
-                " failed words: " +
-                placement.failedWords.join(", "),
+            result.totalAttempts += placement.attempts;
+
+            // Calculate difficulty score
+            const placedWords = placement.placedWords || [];
+            const difficultyFactors = {
+              gridSize: grid.length,
+              wordCount: placedWords.length,
+              minWordLength: Math.min(...words.map(w => w.length)),
+              maxWordLength: Math.max(...words.map(w => w.length)),
+              directions: this.getDirectionsCount(placedWords),
+              allowReverse: true,
+              overlap: "medium" as const,
+              vocabularyLevel: "common" as const,
+            };
+
+            const difficultyScore = DifficultyScorer.calculateScore(difficultyFactors);
+            console.log(`[Generation] Puzzle ${i + 1} attempt ${attempts}: ${difficultyScore.score} - ${difficultyScore.label}`);
+
+            // Check if puzzle meets target difficulty
+            const meetsTarget = DifficultyScorer.meetsTarget(
+              difficultyScore.score,
+              targetDifficulty
             );
-          }
 
-          // Calculate difficulty score
-          const placedWords = placement.placedWords || [];
-          const difficultyFactors = {
-            gridSize: grid.length,
-            wordCount: placedWords.length,
-            minWordLength: Math.min(...words.map((w) => w.length)),
-            maxWordLength: Math.max(...words.map((w) => w.length)),
-            directions: this.getDirectionsCount(placedWords),
-            allowReverse: true,
-            overlap: "medium" as const,
-            vocabularyLevel: "common" as const,
-          };
+            if (!meetsTarget && attempts < maxRegenerationAttempts) {
+              console.log(`[Generation] Puzzle ${i + 1} score ${difficultyScore.score} does not meet target ${targetDifficulty}, regenerating...`);
+              result.regeneratedPuzzles++;
+              continue; // Regenerate this puzzle
+            }
 
-          const difficultyScore =
-            DifficultyScorer.calculateScore(difficultyFactors);
-          console.log(
-            `[Generation] Puzzle ${i + 1} difficulty: ${difficultyScore.score} - ${difficultyScore.label}`,
-          );
+            // Track failed words
+            if (placement.failedWords.length > 0) {
+              result.warnings.push(
+                "Puzzle " +
+                  (i + 1) +
+                  " failed words: " +
+                  placement.failedWords.join(", "),
+              );
+            }
 
-          // Validate puzzle
-          const validation = PuzzleValidator.validatePuzzle(
-            placement.grid,
-            words,
-            placement.placedWords,
-          );
-
-          if (!validation.valid) {
-            result.errors.push(
-              "Puzzle " +
-                (i + 1) +
-                " validation failed: " +
-                validation.errors.join(", "),
+            // Validate puzzle
+            const validation = PuzzleValidator.validatePuzzle(
+              placement.grid,
+              words,
+              placement.placedWords,
             );
-            result.failedPuzzles++;
-            continue;
-          }
 
-          // Check for duplicates
-          const fingerprint = DuplicateDetector.createFingerprint(
-            placement.grid,
-            words,
-            placement.placedWords,
-          );
+            if (!validation.valid) {
+              result.errors.push(
+                "Puzzle " +
+                  (i + 1) +
+                  " validation failed: " +
+                  validation.errors.join(", "),
+              );
+              result.failedPuzzles++;
+              break;
+            }
 
-          const duplicateCheck = DuplicateDetector.isDuplicate(
-            fingerprint,
-            allFingerprints,
-          );
-          if (duplicateCheck && duplicateCheck.isDuplicate) {
-            result.warnings.push(
-              "Puzzle " +
-                (i + 1) +
-                " appears to be a duplicate (score: " +
-                (duplicateCheck.score * 100).toFixed(1) +
-                "%)",
+            // Check for duplicates
+            const fingerprint = DuplicateDetector.createFingerprint(
+              placement.grid,
+              words,
+              placement.placedWords,
             );
-            // Allow duplicates but warn (for now)
-          }
-          allFingerprints.push(fingerprint);
 
-          // Generate solution
-          const solution = SolutionGenerator.generateSolution(
-            placement.grid,
-            placement.placedWords,
-          );
-          const verification = SolutionGenerator.verifySolution(
-            solution,
-            placement.grid,
-            words,
-          );
-
-          if (!verification.valid) {
-            result.errors.push(
-              "Puzzle " +
-                (i + 1) +
-                " solution verification failed: " +
-                verification.errors.join(", "),
+            const duplicateCheck = DuplicateDetector.isDuplicate(
+              fingerprint,
+              allFingerprints,
             );
-            result.failedPuzzles++;
-            continue;
+            if (duplicateCheck && duplicateCheck.isDuplicate) {
+              result.warnings.push(
+                "Puzzle " +
+                  (i + 1) +
+                  " appears to be a duplicate (score: " +
+                  (duplicateCheck.score * 100).toFixed(1) +
+                  "%)",
+              );
+              // Allow duplicates but warn (for now)
+            }
+            allFingerprints.push(fingerprint);
+
+            // Generate solution
+            const solution = SolutionGenerator.generateSolution(
+              placement.grid,
+              placement.placedWords,
+            );
+            const verification = SolutionGenerator.verifySolution(
+              solution,
+              placement.grid,
+              words,
+            );
+
+            if (!verification.valid) {
+              result.errors.push(
+                "Puzzle " +
+                  (i + 1) +
+                  " solution verification failed: " +
+                  verification.errors.join(", "),
+              );
+              result.failedPuzzles++;
+              break;
+            }
+
+            // Save puzzle to database with difficulty score
+            await this.savePuzzle(
+              bookId,
+              placement,
+              words,
+              solution,
+              validation.score,
+              difficultyScore,
+            );
+
+            result.generatedPuzzles++;
+            puzzleGenerated = true;
+
+            // Log warning if puzzle doesn't meet target but was saved anyway (last attempt)
+            if (!meetsTarget) {
+              result.warnings.push(
+                `Puzzle ${i + 1} scored ${difficultyScore.score} (${difficultyScore.label}) but target was ${targetDifficulty}. Saved after ${attempts} attempts.`
+              );
+            }
+
+          } catch (error: any) {
+            if (attempts >= maxRegenerationAttempts) {
+              result.errors.push(
+                "Puzzle " + (i + 1) + " generation failed after " + maxRegenerationAttempts + " attempts: " + error.message,
+              );
+              result.failedPuzzles++;
+            }
           }
-
-          // Save puzzle to database with difficulty score
-          await this.savePuzzle(
-            bookId,
-            placement,
-            words,
-            solution,
-            validation.score,
-            difficultyScore,
-          );
-
-          result.generatedPuzzles++;
-        } catch (error: any) {
-          result.errors.push(
-            "Puzzle " + (i + 1) + " generation failed: " + error.message,
-          );
-          result.failedPuzzles++;
         }
       }
 
@@ -212,6 +241,8 @@ export class GenerationService {
           qualityScore: this.calculateQualityScore(result),
         },
       });
+
+      console.log(`[Generation] Book generation complete. Generated: ${result.generatedPuzzles}/${result.totalPuzzles}, Failed: ${result.failedPuzzles}, Regenerated: ${result.regeneratedPuzzles}`);
 
       return result;
     } catch (error: any) {
