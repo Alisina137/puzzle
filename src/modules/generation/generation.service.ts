@@ -6,6 +6,7 @@ import { PuzzleValidator } from "@/modules/puzzle/puzzle-validator";
 import { DuplicateDetector } from "@/modules/puzzle/duplicate-detector";
 import { SolutionGenerator } from "@/modules/puzzle/solution-generator";
 import { Prisma } from "@prisma/client";
+import { DifficultyScorer } from "@/modules/puzzle";
 
 export interface GenerationResult {
   bookId: string;
@@ -95,6 +96,25 @@ export class GenerationService {
             );
           }
 
+          // Calculate difficulty score
+          const placedWords = placement.placedWords || [];
+          const difficultyFactors = {
+            gridSize: grid.length,
+            wordCount: placedWords.length,
+            minWordLength: Math.min(...words.map((w) => w.length)),
+            maxWordLength: Math.max(...words.map((w) => w.length)),
+            directions: this.getDirectionsCount(placedWords),
+            allowReverse: true,
+            overlap: "medium" as const,
+            vocabularyLevel: "common" as const,
+          };
+
+          const difficultyScore =
+            DifficultyScorer.calculateScore(difficultyFactors);
+          console.log(
+            `[Generation] Puzzle ${i + 1} difficulty: ${difficultyScore.score} - ${difficultyScore.label}`,
+          );
+
           // Validate puzzle
           const validation = PuzzleValidator.validatePuzzle(
             placement.grid,
@@ -158,13 +178,14 @@ export class GenerationService {
             continue;
           }
 
-          // Save puzzle to database
+          // Save puzzle to database with difficulty score
           await this.savePuzzle(
             bookId,
             placement,
             words,
             solution,
             validation.score,
+            difficultyScore,
           );
 
           result.generatedPuzzles++;
@@ -204,7 +225,7 @@ export class GenerationService {
   }
 
   /**
-   * Save a puzzle to the database
+   * Save a puzzle to the database with difficulty score
    */
   private static async savePuzzle(
     bookId: string,
@@ -212,8 +233,9 @@ export class GenerationService {
     words: string[],
     solution: any,
     qualityScore: number,
+    difficultyScore: any,
   ): Promise<void> {
-    // Create puzzle
+    // Create puzzle with difficulty score
     const puzzle = await prisma.puzzle.create({
       data: {
         type: "wordsearch",
@@ -223,7 +245,10 @@ export class GenerationService {
           placedWords: placement.placedWords,
           size: placement.grid.length,
         },
-        difficulty: "medium",
+        difficulty: difficultyScore.label.toLowerCase(),
+        difficultyScore: difficultyScore.score,
+        difficultyLabel: difficultyScore.label,
+        qualityMetrics: difficultyScore.breakdown,
         qualityScore: qualityScore,
       },
     });
@@ -285,5 +310,18 @@ export class GenerationService {
       0,
       Math.min(100, baseScore - errorPenalty - warningPenalty),
     );
+  }
+
+  /**
+   * Count the number of directions used in placed words
+   */
+  private static getDirectionsCount(placedWords: any[]): number {
+    const directions = new Set<string>();
+    for (const word of placedWords) {
+      if (word.direction) {
+        directions.add(word.direction);
+      }
+    }
+    return directions.size;
   }
 }
