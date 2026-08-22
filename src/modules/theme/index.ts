@@ -1,12 +1,4 @@
-export { WordSelectionService } from "./word-selection.service";
-export { WordSelector } from "./word-selector";
-
-export {
-  THEME_WORDS,
-  themeLabels,
-  themeCategories,
-  getThemeWords,
-  isValidTheme,
-} from "./word-lists";
-
-export type { ThemeKey } from "./word-lists";
+export { ThemeCategoryService } from "./theme-category.service";
+export { ThemeService } from "./theme.service";
+export type { CreateCategoryInput, UpdateCategoryInput } from "./theme-category.service";
+export type { CreateThemeInput, UpdateThemeInput } from "./theme.service";
