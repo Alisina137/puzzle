@@ -4,6 +4,7 @@ import {
   themeCategories,
   THEME_WORDS,
 } from "./word-lists/index";
+import { prisma } from "@/lib/prisma";
 
 export interface WordSelectionOptions {
   theme: string;
@@ -13,6 +14,7 @@ export interface WordSelectionOptions {
   minWordLength?: number;
   maxWordLength?: number;
   seed?: number;
+  listId?: string; // Custom word list ID
 }
 
 export interface WordSelectionResult {
@@ -23,6 +25,35 @@ export interface WordSelectionResult {
 }
 
 export class WordSelectionService {
+  /**
+   * Select words from a custom word list
+   */
+  static async selectWordsFromList(listId: string, count: number = 12): Promise<{ words: string[] }> {
+    try {
+      const list = await prisma.customWordList.findUnique({
+        where: { id: listId },
+      });
+
+      if (!list) {
+        throw new Error(`Custom word list with ID ${listId} not found`);
+      }
+
+      const allWords = list.words;
+      if (allWords.length === 0) {
+        throw new Error(`Word list "${list.name}" is empty`);
+      }
+
+      // Shuffle and select words
+      const shuffled = [...allWords].sort(() => Math.random() - 0.5);
+      const selected = shuffled.slice(0, Math.min(count, shuffled.length));
+
+      return { words: selected };
+    } catch (error) {
+      console.error("[WordSelectionService] Error selecting words from list:", error);
+      throw error;
+    }
+  }
+
   static selectWords(options: WordSelectionOptions): WordSelectionResult {
     const {
       theme,

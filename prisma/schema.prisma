@@ -1,4 +1,4 @@
-generator client {
+	generator client {
   provider = "prisma-client-js"
 }
 
@@ -17,6 +17,7 @@ model User {
   updatedAt DateTime @updatedAt
   books     Book[]
   exports   Export[]
+  customWordLists CustomWordList[] 
 
   @@map("users")
 }
@@ -229,6 +230,22 @@ model Template {
 
   @@index([isDefault])
   @@map("templates")
+}
+
+model CustomWordList {
+  id          String   @id @default(cuid())
+  name        String   @db.VarChar(100)
+  description String?
+  words       String[] // Array of words
+  isPublic    Boolean  @default(false)
+  userId      String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isPublic])
+  @@map("custom_word_lists")
 }
 
 // ===== V2 NEW MODELS =====
