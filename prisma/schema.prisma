@@ -1,50 +1,47 @@
-	generator client {
+generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  password  String?
-  image     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  books     Book[]
-  exports   Export[]
-  customWordLists CustomWordList[] 
+  id              String           @id @default(cuid())
+  email           String           @unique
+  name            String?
+  password        String?
+  image           String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  books           Book[]
+  customWordLists CustomWordList[]
+  exports         Export[]
 
   @@map("users")
 }
 
 model Book {
-  id             String          @id @default(cuid())
-  userId         String
-  title          String          @db.VarChar(255)
-  theme          String          @db.VarChar(100)
-  puzzleCount    Int             @default(0)
-  status         String          @default("pending")
-
-  // V2 NEW FIELDS
-  targetAudience String?         @db.VarChar(50)
-  difficultyLevel String?        @db.VarChar(50)
-  generationSettings Json?
-
-  qualityScore   Decimal?        @db.Decimal(5, 2)
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  bookPuzzles    BookPuzzle[]
-  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  exports        Export[]
-  generationJobs GenerationJob[]
-  qualityReport  BookQualityReport?
-  kdpConfig      KDPConfiguration?
-  regenerationRequests RegenerationRequest[]  // <-- ADD THIS LINE
+  id                   String                @id @default(cuid())
+  userId               String
+  title                String                @db.VarChar(255)
+  theme                String                @db.VarChar(100)
+  puzzleCount          Int                   @default(0)
+  status               String                @default("pending")
+  targetAudience       String?               @db.VarChar(50)
+  difficultyLevel      String?               @db.VarChar(50)
+  generationSettings   Json?
+  qualityScore         Decimal?              @db.Decimal(5, 2)
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  bookPuzzles          BookPuzzle[]
+  qualityReport        BookQualityReport?
+  user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exports              Export[]
+  generationJobs       GenerationJob[]
+  kdpConfig            KDPConfiguration?
+  regenerationRequests RegenerationRequest[]
 
   @@index([userId])
   @@index([status])
@@ -52,24 +49,22 @@ model Book {
   @@index([difficultyLevel])
   @@map("books")
 }
+
 model Puzzle {
-  id           String          @id @default(cuid())
-  type         String          @default("wordsearch")
-  data         Json
-  difficulty   String?         @default("medium")
-
-  // V2 NEW FIELDS
-  difficultyScore Int?         @default(0)
-  difficultyLabel String?      @db.VarChar(20)
-  validationStatus String?     @db.VarChar(20)
-  qualityMetrics Json?
-  fingerprint   String?        @db.VarChar(255)
-
-  qualityScore Decimal?        @db.Decimal(5, 2)
-  createdAt    DateTime        @default(now())
-  bookPuzzles  BookPuzzle[]
-  versions     PuzzleVersion[]
-  regenerationRequests RegenerationRequest[]  // <-- ADD THIS LINE
+  id                   String                @id @default(cuid())
+  type                 String                @default("wordsearch")
+  data                 Json
+  difficulty           String?               @default("medium")
+  difficultyScore      Int?                  @default(0)
+  difficultyLabel      String?               @db.VarChar(20)
+  validationStatus     String?               @db.VarChar(20)
+  qualityMetrics       Json?
+  fingerprint          String?               @db.VarChar(255)
+  qualityScore         Decimal?              @db.Decimal(5, 2)
+  createdAt            DateTime              @default(now())
+  bookPuzzles          BookPuzzle[]
+  versions             PuzzleVersion[]
+  regenerationRequests RegenerationRequest[]
 
   @@index([type])
   @@index([difficultyScore])
@@ -125,22 +120,19 @@ model Solution {
 }
 
 model Theme {
-  id         String      @id @default(cuid())
-  name       String      @unique @db.VarChar(100)
-  categoryId String?
-  isCustom   Boolean     @default(false)
-  wordCount  Int         @default(0)
-
-  // V2 NEW FIELDS
-  description String?     @db.VarChar(500)
-  difficulty  String?     @db.VarChar(20)
+  id          String         @id @default(cuid())
+  name        String         @unique @db.VarChar(100)
+  categoryId  String?
+  isCustom    Boolean        @default(false)
+  wordCount   Int            @default(0)
+  description String?        @db.VarChar(500)
+  difficulty  String?        @db.VarChar(20)
   tags        String[]
-  usageCount  Int         @default(0)
-  isPublic    Boolean     @default(true)
-
-  createdAt  DateTime    @default(now())
-  words      ThemeWord[]
-  category   ThemeCategory? @relation(fields: [categoryId], references: [id])
+  usageCount  Int            @default(0)
+  isPublic    Boolean        @default(true)
+  createdAt   DateTime       @default(now())
+  words       ThemeWord[]
+  category    ThemeCategory? @relation(fields: [categoryId], references: [id])
 
   @@index([name])
   @@index([isPublic])
@@ -236,7 +228,7 @@ model CustomWordList {
   id          String   @id @default(cuid())
   name        String   @db.VarChar(100)
   description String?
-  words       String[] // Array of words
+  words       String[]
   isPublic    Boolean  @default(false)
   userId      String
   createdAt   DateTime @default(now())
@@ -248,18 +240,16 @@ model CustomWordList {
   @@map("custom_word_lists")
 }
 
-// ===== V2 NEW MODELS =====
-
 model ConfigurationTemplate {
-  id               String   @id @default(cuid())
-  name             String   @db.VarChar(100)
-  audience         String   @db.VarChar(50)    // Children, Teenagers, Adults, Seniors, PuzzleEnthusiasts
-  difficulty       String   @db.VarChar(50)    // Easy, Medium, Hard, Expert
-  config           Json                       // { gridSize, wordsPerPuzzle, minWordLength, maxWordLength, directions, allowReverse, overlap, vocabularyLevel }
-  isDefault        Boolean  @default(false)
-  description      String?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id          String   @id @default(cuid())
+  name        String   @db.VarChar(100)
+  audience    String   @db.VarChar(50)
+  difficulty  String   @db.VarChar(50)
+  config      Json
+  isDefault   Boolean  @default(false)
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@unique([audience, difficulty])
   @@index([audience, difficulty])
@@ -267,46 +257,45 @@ model ConfigurationTemplate {
 }
 
 model ThemeCategory {
-  id         String   @id @default(cuid())
-  name       String   @unique @db.VarChar(100)
+  id          String   @id @default(cuid())
+  name        String   @unique @db.VarChar(100)
   description String?
-  icon       String?  @db.VarChar(50)
-  createdAt  DateTime @default(now())
-  themes     Theme[]
+  icon        String?  @db.VarChar(50)
+  createdAt   DateTime @default(now())
+  themes      Theme[]
 
   @@map("theme_categories")
 }
 
 model BookQualityReport {
-  id               String   @id @default(cuid())
-  bookId           String
-  score            Decimal  @db.Decimal(5, 2)
-  totalPuzzles     Int
-  validPuzzles     Int
-  verifiedSolutions Int
-  duplicates       Int
+  id                    String   @id @default(cuid())
+  bookId                String   @unique
+  score                 Decimal  @db.Decimal(5, 2)
+  totalPuzzles          Int
+  validPuzzles          Int
+  verifiedSolutions     Int
+  duplicates            Int
   difficultyConsistency Decimal? @db.Decimal(5, 2)
-  warnings         Json?
-  recommendations  Json?
-  generatedAt      DateTime @default(now())
-  book             Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  warnings              Json?
+  recommendations       Json?
+  generatedAt           DateTime @default(now())
+  book                  Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
 
-  @@unique([bookId])
   @@index([bookId])
   @@map("book_quality_reports")
 }
 
 model RegenerationRequest {
-  id               String   @id @default(cuid())
-  bookId           String
-  puzzleId         String
-  reason           String   @db.VarChar(255)
-  requestedAt      DateTime @default(now())
-  processedAt      DateTime?
-  status           String   @default("pending") // pending, processing, completed, failed
-  newPuzzleId      String?
-  book             Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
-  puzzle           Puzzle   @relation(fields: [puzzleId], references: [id], onDelete: Cascade)
+  id          String    @id @default(cuid())
+  bookId      String
+  puzzleId    String
+  reason      String    @db.VarChar(255)
+  requestedAt DateTime  @default(now())
+  processedAt DateTime?
+  status      String    @default("pending")
+  newPuzzleId String?
+  book        Book      @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  puzzle      Puzzle    @relation(fields: [puzzleId], references: [id], onDelete: Cascade)
 
   @@index([bookId])
   @@index([status])
@@ -314,23 +303,22 @@ model RegenerationRequest {
 }
 
 model KDPConfiguration {
-  id               String   @id @default(cuid())
-  bookId           String
-  trimSize         String   @db.VarChar(50)   // 6x9, 8.5x11, etc.
-  hasBleed         Boolean  @default(false)
-  marginTop        Int      @default(72)      // in points
-  marginBottom     Int      @default(72)
-  marginLeft       Int      @default(72)
-  marginRight      Int      @default(72)
-  gutter           Int      @default(0)
-  largePrint       Boolean  @default(false)
-  pageNumbering    Boolean  @default(true)
-  solutionPlacement String  @default("end")   // end, after_each, none
-  includeSolution  Boolean  @default(true)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-  book             Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  id                String   @id @default(cuid())
+  bookId            String   @unique
+  trimSize          String   @db.VarChar(50)
+  hasBleed          Boolean  @default(false)
+  marginTop         Int      @default(72)
+  marginBottom      Int      @default(72)
+  marginLeft        Int      @default(72)
+  marginRight       Int      @default(72)
+  gutter            Int      @default(0)
+  largePrint        Boolean  @default(false)
+  pageNumbering     Boolean  @default(true)
+  solutionPlacement String   @default("end")
+  includeSolution   Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  book              Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
 
-  @@unique([bookId])
   @@map("kdp_configurations")
 }

@@ -7,6 +7,7 @@ import { DuplicateDetector } from "@/modules/puzzle/duplicate-detector";
 import { SolutionGenerator } from "@/modules/puzzle/solution-generator";
 import { Prisma } from "@prisma/client";
 import { DifficultyScorer } from "@/modules/puzzle";
+import { QualityReportService } from "@/modules/quality";
 
 export interface GenerationResult {
   bookId: string;
@@ -241,6 +242,16 @@ export class GenerationService {
           qualityScore: this.calculateQualityScore(result),
         },
       });
+
+      // Generate quality report
+      try {
+        console.log("[Generation] Generating quality report for book:", bookId);
+        await QualityReportService.generateReport(bookId);
+        console.log("[Generation] Quality report generated successfully");
+      } catch (reportError) {
+        console.error("[Generation] Failed to generate quality report:", reportError);
+        // Don't fail the generation if report generation fails
+      }
 
       console.log(`[Generation] Book generation complete. Generated: ${result.generatedPuzzles}/${result.totalPuzzles}, Failed: ${result.failedPuzzles}, Regenerated: ${result.regeneratedPuzzles}`);
 
