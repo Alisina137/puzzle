@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { Theme } from "@prisma/client";
+import { Prisma, Theme } from "@prisma/client";
 
 export interface CreateThemeInput {
   name: string;
@@ -275,6 +275,78 @@ export class ThemeService {
     } catch (error) {
       console.error("[ThemeService] Error removing words from theme:", error);
       return null;
+    }
+  }
+
+  /**
+   * Search themes with filters
+   */
+  static async searchThemes(filters: {
+    search?: string;
+    categoryId?: string;
+    difficulty?: string;
+    isPublic?: boolean;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ themes: Theme[]; total: number }> {
+    try {
+      const {
+        search = "",
+        categoryId,
+        difficulty,
+        isPublic,
+        limit = 50,
+        offset = 0,
+      } = filters;
+
+      const where: Prisma.ThemeWhereInput = {};
+
+      if (search) {
+        where.OR = [
+          { name: { contains: search, mode: "insensitive" } },
+          { description: { contains: search, mode: "insensitive" } },
+          {
+            words: {
+              some: {
+                word: { contains: search, mode: "insensitive" },
+              },
+            },
+          },
+        ];
+      }
+
+      if (categoryId) {
+        where.categoryId = categoryId;
+      }
+
+      if (difficulty) {
+        where.difficulty = difficulty;
+      }
+
+      if (isPublic !== undefined) {
+        where.isPublic = isPublic;
+      }
+
+      const [themes, total] = await Promise.all([
+        prisma.theme.findMany({
+          where,
+          include: {
+            words: true,
+            category: true,
+          },
+          orderBy: {
+            name: "asc",
+          },
+          take: limit,
+          skip: offset,
+        }),
+        prisma.theme.count({ where }),
+      ]);
+
+      return { themes, total };
+    } catch (error) {
+      console.error("[ThemeService] Error searching themes:", error);
+      return { themes: [], total: 0 };
     }
   }
 }
