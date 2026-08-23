@@ -10,6 +10,7 @@ import {
   Trash2,
   FileText,
   Eye,
+  FileType,
 } from "lucide-react";
 import Link from "next/link";
 import { GenerationProgress } from "@/components/generation/GenerationProgress";
@@ -54,17 +55,6 @@ interface Book {
   bookPuzzles: BookPuzzle[];
 }
 
-interface Book {
-  id: string;
-  title: string;
-  theme: string;
-  puzzleCount: number;
-  status: string;
-  qualityScore: number | null;
-  createdAt: string;
-  bookPuzzles: BookPuzzle[];
-}
-
 export default function BookPage() {
   const params = useParams<{ bookId: string }>();
   const router = useRouter();
@@ -77,6 +67,7 @@ export default function BookPage() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [isExportingDOCX, setIsExportingDOCX] = useState(false);
 
   useEffect(() => {
     if (!bookId) {
@@ -116,7 +107,6 @@ export default function BookPage() {
         setError(null);
       } catch (err: unknown) {
         console.error("Error fetching book:", err);
-
         setError(err instanceof Error ? err.message : "Failed to load book");
       } finally {
         setLoading(false);
@@ -163,7 +153,6 @@ export default function BookPage() {
 
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
-
       const link = document.createElement("a");
       link.href = url;
       link.download = `${book.title.replace(/\s+/g, "_")}.pdf`;
@@ -186,6 +175,69 @@ export default function BookPage() {
       );
     } finally {
       setIsExporting(false);
+    }
+  };
+
+  const handleExportDOCX = async () => {
+    if (!book || isExportingDOCX) {
+      return;
+    }
+
+    const toastId = toast.loading("Generating DOCX...");
+
+    setIsExportingDOCX(true);
+
+    try {
+      const response = await fetch(`/api/books/${bookId}/export/docx`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          includeSolutions: true,
+          solutionPlacement: "end",
+          largePrint: false,
+          pageNumbering: true,
+        }),
+      });
+
+      if (!response.ok) {
+        let message = "Failed to export DOCX";
+
+        try {
+          const error = await response.json();
+          message = error?.error || message;
+        } catch {
+          // Ignore invalid JSON error response.
+        }
+
+        throw new Error(message);
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${book.title.replace(/\s+/g, "_")}.docx`;
+
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+
+      window.URL.revokeObjectURL(url);
+
+      toast.dismiss(toastId);
+      toast.success("DOCX exported successfully! 📄");
+    } catch (error: unknown) {
+      console.error("DOCX export error:", error);
+
+      toast.dismiss(toastId);
+
+      toast.error(
+        error instanceof Error ? error.message : "Failed to export DOCX",
+      );
+    } finally {
+      setIsExportingDOCX(false);
     }
   };
 
@@ -221,7 +273,6 @@ export default function BookPage() {
       router.push("/books");
     } catch (error: unknown) {
       console.error("Error deleting book:", error);
-
       toast.dismiss(toastId);
       toast.error("Failed to delete book. Please try again.");
 
@@ -261,19 +312,8 @@ export default function BookPage() {
     }
   };
 
-  const handlePuzzleUpdate = (updatedPuzzle: BookPuzzle) => {
-    setBook((prevBook) => {
-      if (!prevBook) {
-        return prevBook;
-      }
-
-      return {
-        ...prevBook,
-        bookPuzzles: prevBook.bookPuzzles.map((bookPuzzle) =>
-          bookPuzzle.id === updatedPuzzle.id ? updatedPuzzle : bookPuzzle,
-        ),
-      };
-    });
+  const handlePuzzleUpdate = () => {
+    setRefreshKey((prev) => prev + 1);
   };
 
   const getStatusBadge = (status: string) => {
@@ -364,6 +404,25 @@ export default function BookPage() {
                     <>
                       <FileText size={18} />
                       Export PDF
+                    </>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleExportDOCX}
+                  disabled={isExportingDOCX}
+                  className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {isExportingDOCX ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <FileType size={18} />
+                      Export DOCX
                     </>
                   )}
                 </button>
