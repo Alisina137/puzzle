@@ -36,8 +36,14 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
   ];
 
   const isActive = (href: string) => {
-    return pathname === href || pathname?.startsWith(href + "/");
-  };
+  // Exact match for all routes
+  if (pathname === href) return true;
+  // For dashboard, match dashboard sub-pages
+  if (href === "/dashboard") {
+    return pathname?.startsWith("/dashboard") && pathname !== "/dashboard";
+  }
+  return false;
+};
 
   return (
     <>

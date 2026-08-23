@@ -1,17 +1,21 @@
-﻿'use client';
+﻿"use client";
 
-import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import Link from 'next/link';
+import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import {
-  PlusCircle,
   BookOpen,
-  ArrowRight,
-  Loader2,
+  PlusCircle,
   Trash2,
-} from 'lucide-react';
-import { useEffect, useState } from 'react';
-import { BookCardSkeleton } from '@/components/ui/Skeleton';
-import { Pagination } from '@/components/ui/Pagination';
+  Eye,
+  RefreshCw,
+  Loader2,
+  CheckCircle,
+  Clock,
+  AlertCircle,
+} from "lucide-react";
+import { BookCardSkeleton } from "@/components/ui/Skeleton";
+import { Pagination } from "@/components/ui/Pagination";
 import { toast } from "sonner";
 
 interface Book {
@@ -22,9 +26,9 @@ interface Book {
   status: string;
   qualityScore: number | null;
   createdAt: string;
+  targetAudience?: string | null;
+  difficultyLevel?: string | null;
 }
-
-const PAGE_SIZE = 9;
 
 export default function BooksPage() {
   const [books, setBooks] = useState<Book[]>([]);
@@ -33,112 +37,115 @@ export default function BooksPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalBooks, setTotalBooks] = useState(0);
   const [deletingBookId, setDeletingBookId] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const pageSize = 12;
 
-  const fetchBooks = async () => {
+  const fetchBooks = async (showLoading: boolean = true) => {
     try {
-      setLoading(true);
+      if (showLoading) setLoading(true);
       setError(null);
-
-      const response = await fetch('/api/books');
-
-      if (response.status === 401) {
-        window.location.href = '/login';
-        return;
+      const response = await fetch("/api/books");
+      if (response.ok) {
+        const result = await response.json();
+        const bookData = result.data || [];
+        setBooks(bookData);
+        setTotalBooks(bookData.length);
+      } else {
+        throw new Error("Failed to fetch books");
       }
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch books');
-      }
-
-      const result = await response.json();
-      const booksData = result.data?.books || result.data || [];
-
-      setBooks(booksData);
-      setTotalBooks(booksData.length);
-    } catch (error) {
-      console.error('Error fetching books:', error);
-      setError('Failed to load books');
+    } catch (err) {
+      console.error("Error fetching books:", err);
+      setError("Failed to load books");
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
+      setIsRefreshing(false);
     }
   };
 
+  // Initial fetch
   useEffect(() => {
-    fetchBooks();
+    fetchBooks(true);
   }, []);
 
-  const handleDeleteBook = async (bookId: string, bookTitle: string) => {
-    if (
-      !confirm(
-        `Are you sure you want to delete "${bookTitle}"? This action cannot be undone.`,
-      )
-    ) {
-      return;
-    }
+  // Poll for status updates every 3 seconds if there are pending books
+  useEffect(() => {
+    const hasPending = books.some(
+      (book) => book.status === "pending" || book.status === "generating",
+    );
 
-    const toastId = toast.loading("Deleting book...");
+    if (!hasPending) return;
+
+    const interval = setInterval(() => {
+      fetchBooks(false);
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [books]);
+
+  const handleManualRefresh = () => {
+    setIsRefreshing(true);
+    fetchBooks(false);
+  };
+
+  const handleDelete = async (bookId: string, title: string) => {
+    if (!confirm(`Are you sure you want to delete "${title}"?`)) return;
 
     setDeletingBookId(bookId);
+    const toastId = toast.loading("Deleting book...");
+
     try {
-      const response = await fetch("/api/books/" + bookId, {
+      const response = await fetch(`/api/books/${bookId}`, {
         method: "DELETE",
       });
 
-      if (!response.ok) {
-        throw new Error("Failed to delete book");
-      }
+      if (!response.ok) throw new Error("Failed to delete book");
 
       toast.dismiss(toastId);
-      toast.success("Book deleted successfully! 🗑️");
-
-      await fetchBooks();
+      toast.success(`"${title}" deleted successfully`);
+      fetchBooks(true);
     } catch (error) {
       console.error("Error deleting book:", error);
       toast.dismiss(toastId);
-      toast.error("Failed to delete book. Please try again.");
+      toast.error("Failed to delete book");
     } finally {
       setDeletingBookId(null);
     }
   };
 
-  const totalPages = Math.ceil(totalBooks / PAGE_SIZE);
-
-  const paginatedBooks = books.slice(
-    (currentPage - 1) * PAGE_SIZE,
-    currentPage * PAGE_SIZE
-  );
-
   const getStatusBadge = (status: string) => {
     const styles: Record<string, string> = {
-      pending: 'bg-gray-100 text-gray-600',
-      generating: 'bg-yellow-100 text-yellow-700',
-      ready: 'bg-green-100 text-green-700',
-      exporting: 'bg-purple-100 text-purple-700',
-      exported: 'bg-blue-100 text-blue-700',
-      failed: 'bg-red-100 text-red-700',
+      pending: "bg-yellow-100 text-yellow-700",
+      generating: "bg-blue-100 text-blue-700",
+      ready: "bg-green-100 text-green-700",
+      failed: "bg-red-100 text-red-700",
     };
 
-    return styles[status] || 'bg-gray-100 text-gray-600';
+    return styles[status] || "bg-gray-100 text-gray-600";
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "pending":
+        return <Clock size={14} className="text-yellow-600" />;
+      case "generating":
+        return <Loader2 size={14} className="animate-spin text-blue-600" />;
+      case "ready":
+        return <CheckCircle size={14} className="text-green-600" />;
+      case "failed":
+        return <AlertCircle size={14} className="text-red-600" />;
+      default:
+        return null;
+    }
   };
 
   if (loading) {
     return (
       <DashboardLayout>
         <div className="space-y-6">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-800">
-                My Books
-              </h1>
-
-              <p className="text-gray-500 mt-1">
-                Loading your books...
-              </p>
-            </div>
-
-            <div className="w-32 h-10 bg-gray-200 rounded-lg animate-pulse" />
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800">My Books</h1>
+            <p className="text-gray-500 mt-1">Loading your books...</p>
           </div>
-
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {[...Array(6)].map((_, i) => (
               <BookCardSkeleton key={i} />
@@ -152,12 +159,11 @@ export default function BooksPage() {
   if (error) {
     return (
       <DashboardLayout>
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
+        <div className="text-center py-12">
           <p className="text-red-500">{error}</p>
-
           <button
-            onClick={() => window.location.reload()}
-            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            onClick={() => fetchBooks(true)}
+            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
           >
             Retry
           </button>
@@ -166,148 +172,185 @@ export default function BooksPage() {
     );
   }
 
+  const paginatedBooks = books.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize,
+  );
+
+  const hasPending = books.some(
+    (book) => book.status === "pending" || book.status === "generating",
+  );
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
-
-        {/* Header */}
-        <div className="flex justify-between items-center">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h1 className="text-2xl font-bold text-gray-800">
-              My Books
-            </h1>
-
+            <h1 className="text-2xl font-bold text-gray-800">My Books</h1>
             <p className="text-gray-500 mt-1">
-              Manage your puzzle books
+              {totalBooks} book{totalBooks !== 1 ? "s" : ""} found
+              {hasPending && (
+                <span className="ml-2 text-sm text-blue-600 animate-pulse">
+                  (Updating...)
+                </span>
+              )}
             </p>
           </div>
-
-          <Link
-            href="/books/new"
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            <PlusCircle size={18} />
-            Create Book
-          </Link>
-        </div>
-
-        {/* Empty State */}
-        {books.length === 0 ? (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
-            <BookOpen
-              size={48}
-              className="text-gray-300 mx-auto mb-4"
-            />
-
-            <h3 className="text-lg font-semibold text-gray-800 mb-2">
-              No books yet
-            </h3>
-
-            <p className="text-gray-500 text-sm mb-4">
-              Create your first puzzle book to get started.
-            </p>
-
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={handleManualRefresh}
+              disabled={isRefreshing}
+              className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+            >
+              <RefreshCw
+                size={18}
+                className={isRefreshing ? "animate-spin" : ""}
+              />
+              Refresh
+            </button>
             <Link
               href="/books/new"
-              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
             >
               <PlusCircle size={18} />
-              Create Your First Book
+              Create Book
+            </Link>
+          </div>
+        </div>
+
+        {books.length === 0 ? (
+          <div className="text-center py-12 bg-white rounded-xl border border-gray-200">
+            <BookOpen size={48} className="mx-auto text-gray-300 mb-3" />
+            <h3 className="text-lg font-medium text-gray-600">No books yet</h3>
+            <p className="text-gray-400 text-sm mt-1">
+              Create your first puzzle book to get started
+            </p>
+            <Link
+              href="/books/new"
+              className="mt-4 inline-block px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Create Book
             </Link>
           </div>
         ) : (
           <>
-            {/* Books Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {paginatedBooks.map((book) => (
-                <div
-                  key={book.id}
-                  className="bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow p-6 group"
-                >
-                  {/* Book Link */}
-                  <Link
-                    href={'/books/' + book.id}
-                    className="block"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-gray-800 truncate group-hover:text-blue-600 transition-colors">
-                          {book.title}
-                        </h3>
+              {paginatedBooks.map((book) => {
+                const statusClass = getStatusBadge(book.status);
+                const StatusIcon = getStatusIcon(book.status);
+                const isUpdating =
+                  book.status === "pending" || book.status === "generating";
 
-                        <p className="text-sm text-gray-500 truncate">
-                          Theme: {book.theme}
+                return (
+                  <div
+                    key={book.id}
+                    className={`bg-white rounded-xl border border-gray-200 p-5 hover:shadow-md transition-shadow ${
+                      isUpdating ? "border-blue-300 shadow-blue-100" : ""
+                    }`}
+                  >
+                    {/* Header: Title + Status */}
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 min-w-0">
+                        <Link
+                          href={`/books/${book.id}`}
+                          className="block group"
+                        >
+                          <h3 className="font-semibold text-gray-800 group-hover:text-blue-600 transition-colors truncate">
+                            {book.title}
+                          </h3>
+                        </Link>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                        <span
+                          className={`px-2 py-1 text-xs font-medium rounded-full flex items-center gap-1 ${statusClass}`}
+                        >
+                          {StatusIcon}
+                          {book.status}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Book Details in Labeled Format */}
+                    <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+                      <div>
+                        <span className="text-gray-400">Theme</span>
+                        <p className="font-medium text-gray-700 truncate">
+                          {book.theme}
                         </p>
                       </div>
-
-                      <span
-                        className={
-                          'shrink-0 px-2 py-0.5 text-xs rounded-full ' +
-                          getStatusBadge(book.status)
-                        }
-                      >
-                        {book.status}
-                      </span>
+                      <div>
+                        <span className="text-gray-400">Puzzles</span>
+                        <p className="font-medium text-gray-700">
+                          {book.puzzleCount}
+                        </p>
+                      </div>
+                      {book.targetAudience && (
+                        <div>
+                          <span className="text-gray-400">Audience</span>
+                          <p className="font-medium text-gray-700">
+                            {book.targetAudience}
+                          </p>
+                        </div>
+                      )}
+                      {book.difficultyLevel && (
+                        <div>
+                          <span className="text-gray-400">Difficulty</span>
+                          <p className="font-medium text-gray-700">
+                            {book.difficultyLevel}
+                          </p>
+                        </div>
+                      )}
+                      {book.qualityScore !== null &&
+                        book.qualityScore !== undefined && (
+                          <div>
+                            <span className="text-gray-400">Quality</span>
+                            <p className="font-medium text-gray-700">
+                              {Math.round(book.qualityScore)}%
+                            </p>
+                          </div>
+                        )}
+                      <div>
+                        <span className="text-gray-400">Created</span>
+                        <p className="font-medium text-gray-700 text-xs">
+                          {new Date(book.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
                     </div>
-                  </Link>
 
-                  {/* Card Footer */}
-                  <div className="mt-4 flex items-center justify-between">
-                    <span className="text-sm text-gray-500">
-                      {book.puzzleCount} puzzles
-                    </span>
-
-                    <div className="flex items-center gap-1">
-
-                      {/* Delete Button */}
+                    {/* Actions */}
+                    <div className="mt-4 flex items-center gap-2 pt-3 border-t border-gray-100">
+                      <Link
+                        href={`/books/${book.id}`}
+                        className="flex-1 flex items-center justify-center gap-1 px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                      >
+                        <Eye size={16} />
+                        View
+                      </Link>
                       <button
-                        type="button"
-                        onClick={() =>
-                          handleDeleteBook(
-                            book.id,
-                            book.title
-                          )
-                        }
+                        onClick={() => handleDelete(book.id, book.title)}
                         disabled={deletingBookId === book.id}
-                        className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                        title="Delete book"
-                        aria-label={'Delete ' + book.title}
+                        className="flex items-center justify-center gap-1 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
                       >
                         {deletingBookId === book.id ? (
-                          <Loader2
-                            size={16}
-                            className="animate-spin"
-                          />
+                          <Loader2 size={16} className="animate-spin" />
                         ) : (
                           <Trash2 size={16} />
                         )}
                       </button>
-
-                      {/* Open Book */}
-                      <Link
-                        href={'/books/' + book.id}
-                        className="p-1.5 text-blue-600 rounded-lg hover:bg-blue-50 transition-colors"
-                        title="Open book"
-                        aria-label={'Open ' + book.title}
-                      >
-                        <ArrowRight
-                          size={16}
-                          className="group-hover:translate-x-1 transition-transform"
-                        />
-                      </Link>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <Pagination
-                currentPage={currentPage}
-                totalPages={totalPages}
-                onPageChange={setCurrentPage}
-              />
+            {totalBooks > pageSize && (
+              <div className="flex justify-center mt-6">
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={Math.ceil(totalBooks / pageSize)}
+                  onPageChange={setCurrentPage}
+                />
+              </div>
             )}
           </>
         )}

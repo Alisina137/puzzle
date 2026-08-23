@@ -29,8 +29,9 @@ export default function DashboardPage() {
         const response = await fetch('/api/books');
         if (response.ok) {
           const result = await response.json();
-          const books = result.data?.books || [];
-          const totalPuzzles = books.reduce((sum: number, book: any) => sum + book.puzzleCount, 0);
+          // The API returns data directly as an array, not as { books: [...] }
+          const books = result.data || [];
+          const totalPuzzles = books.reduce((sum: number, book: any) => sum + (book.puzzleCount || 0), 0);
 
           setStats({
             totalBooks: books.length,
@@ -70,7 +71,6 @@ export default function DashboardPage() {
         <StaggerContainer staggerDelay={0.1}>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {loading ? (
-              // Show skeleton while loading
               <>
                 <DashboardStatSkeleton />
                 <DashboardStatSkeleton />

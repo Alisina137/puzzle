@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -125,7 +125,7 @@ export default function BookPreviewPage() {
 
         {/* Footer */}
         <div className="text-xs text-gray-400 text-right">
-          Preview mode � {book.puzzleCount} puzzles
+          Preview mode · {book.puzzleCount} puzzles
         </div>
       </div>
     </DashboardLayout>

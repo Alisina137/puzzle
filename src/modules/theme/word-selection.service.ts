@@ -14,7 +14,7 @@ export interface WordSelectionOptions {
   minWordLength?: number;
   maxWordLength?: number;
   seed?: number;
-  listId?: string; // Custom word list ID
+  listId?: string;
 }
 
 export interface WordSelectionResult {
@@ -26,9 +26,34 @@ export interface WordSelectionResult {
 
 export class WordSelectionService {
   /**
+   * Get all words for a theme
+   */
+  static getThemeWords(theme: string): string[] {
+    if (!(theme in THEME_WORDS)) {
+      throw new Error(`Invalid theme: ${theme}`);
+    }
+    const themeKey = theme as ThemeKey;
+    return THEME_WORDS[themeKey];
+  }
+
+  /**
+   * Get the total word count for a theme
+   */
+  static getThemeWordCount(theme: string): number {
+    if (!(theme in THEME_WORDS)) {
+      return 0;
+    }
+    const themeKey = theme as ThemeKey;
+    return THEME_WORDS[themeKey].length;
+  }
+
+  /**
    * Select words from a custom word list
    */
-  static async selectWordsFromList(listId: string, count: number = 12): Promise<{ words: string[] }> {
+  static async selectWordsFromList(
+    listId: string,
+    count: number = 12,
+  ): Promise<{ words: string[] }> {
     try {
       const list = await prisma.customWordList.findUnique({
         where: { id: listId },
@@ -43,13 +68,15 @@ export class WordSelectionService {
         throw new Error(`Word list "${list.name}" is empty`);
       }
 
-      // Shuffle and select words
       const shuffled = [...allWords].sort(() => Math.random() - 0.5);
       const selected = shuffled.slice(0, Math.min(count, shuffled.length));
 
       return { words: selected };
     } catch (error) {
-      console.error("[WordSelectionService] Error selecting words from list:", error);
+      console.error(
+        "[WordSelectionService] Error selecting words from list:",
+        error,
+      );
       throw error;
     }
   }

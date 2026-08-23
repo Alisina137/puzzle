@@ -18,6 +18,7 @@ export interface GenerationResult {
   errors: string[];
   warnings: string[];
   regeneratedPuzzles: number;
+  qualityScore: number; // Add this line
 }
 
 export class GenerationService {
@@ -34,6 +35,7 @@ export class GenerationService {
       errors: [],
       warnings: [],
       regeneratedPuzzles: 0,
+      qualityScore: 0, // Add this line
     };
 
     try {
@@ -54,14 +56,108 @@ export class GenerationService {
 
       result.totalPuzzles = book.puzzleCount;
 
-      // Get theme words
+      // Get theme words with tracking to avoid duplicates across puzzles
       let wordResult;
+      let usedWords: string[] = [];
+      const totalThemeWords = WordSelectionService.getThemeWordCount(
+        book.theme,
+      );
+      const wordsPerPuzzle = book.puzzleCount > 0 ? Math.min(12, 15) : 12;
+
       try {
-        wordResult = WordSelectionService.selectWords({
-          theme: book.theme,
-          count: 12,
-          difficulty: "medium",
-        });
+        console.log(
+          `[Generation] Selecting ${wordsPerPuzzle} words for theme: ${book.theme}`,
+        );
+        console.log(`[Generation] Theme has ${totalThemeWords} total words`);
+
+        // Get available words from the theme
+        const allThemeWords = WordSelectionService.getThemeWords(book.theme);
+        let availableWords = allThemeWords.filter(
+          (w) => !usedWords.includes(w),
+        );
+
+        // If not enough words, reset used words
+        if (availableWords.length < wordsPerPuzzle) {
+          console.log(
+            `[Generation] Not enough unused words (${availableWords.length}), resetting used words`,
+          );
+          usedWords = [];
+          availableWords = allThemeWords;
+        }
+
+        // Shuffle and select
+        const shuffled = [...availableWords].sort(() => Math.random() - 0.5);
+        const selected = shuffled.slice(
+          0,
+          Math.min(wordsPerPuzzle, shuffled.length),
+        );
+
+        if (selected.length < wordsPerPuzzle) {
+          console.warn(
+            `[Generation] Only ${selected.length} words available, using all of them`,
+          );
+          if (selected.length < Math.min(3, wordsPerPuzzle)) {
+            // Try one more time with all words
+            const allShuffled = [...allThemeWords].sort(
+              () => Math.random() - 0.5,
+            );
+            const allSelected = allShuffled.slice(
+              0,
+              Math.min(wordsPerPuzzle, allShuffled.length),
+            );
+            if (allSelected.length > selected.length) {
+              wordResult = {
+                words: allSelected,
+                theme: book.theme,
+                difficulty: "medium",
+                totalAvailable: allThemeWords.length,
+              };
+              console.log(
+                `[Generation] Used fallback, selected ${wordResult.words.length} words`,
+              );
+            } else {
+              // Use whatever we have, even if less than requested
+              wordResult = {
+                words:
+                  selected.length > 0
+                    ? selected
+                    : allThemeWords.slice(
+                        0,
+                        Math.min(wordsPerPuzzle, allThemeWords.length),
+                      ),
+                theme: book.theme,
+                difficulty: "medium",
+                totalAvailable: allThemeWords.length,
+              };
+              console.log(
+                `[Generation] Using ${wordResult.words.length} words (forced)`,
+              );
+            }
+          } else {
+            wordResult = {
+              words: selected,
+              theme: book.theme,
+              difficulty: "medium",
+              totalAvailable: allThemeWords.length,
+            };
+          }
+        } else {
+          wordResult = {
+            words: selected,
+            theme: book.theme,
+            difficulty: "medium",
+            totalAvailable: allThemeWords.length,
+          };
+        }
+
+        // Track used words
+        if (wordResult && wordResult.words.length > 0) {
+          usedWords = [...usedWords, ...wordResult.words];
+        }
+
+        console.log(
+          `[Generation] Selected ${wordResult?.words?.length || 0} words, used ${usedWords.length} total`,
+        );
       } catch (error: any) {
         result.errors.push("Failed to select words: " + error.message);
         await prisma.book.update({
@@ -100,25 +196,30 @@ export class GenerationService {
             const difficultyFactors = {
               gridSize: grid.length,
               wordCount: placedWords.length,
-              minWordLength: Math.min(...words.map(w => w.length)),
-              maxWordLength: Math.max(...words.map(w => w.length)),
+              minWordLength: Math.min(...words.map((w) => w.length)),
+              maxWordLength: Math.max(...words.map((w) => w.length)),
               directions: this.getDirectionsCount(placedWords),
               allowReverse: true,
               overlap: "medium" as const,
               vocabularyLevel: "common" as const,
             };
 
-            const difficultyScore = DifficultyScorer.calculateScore(difficultyFactors);
-            console.log(`[Generation] Puzzle ${i + 1} attempt ${attempts}: ${difficultyScore.score} - ${difficultyScore.label}`);
+            const difficultyScore =
+              DifficultyScorer.calculateScore(difficultyFactors);
+            console.log(
+              `[Generation] Puzzle ${i + 1} attempt ${attempts}: ${difficultyScore.score} - ${difficultyScore.label}`,
+            );
 
             // Check if puzzle meets target difficulty
             const meetsTarget = DifficultyScorer.meetsTarget(
               difficultyScore.score,
-              targetDifficulty
+              targetDifficulty,
             );
 
             if (!meetsTarget && attempts < maxRegenerationAttempts) {
-              console.log(`[Generation] Puzzle ${i + 1} score ${difficultyScore.score} does not meet target ${targetDifficulty}, regenerating...`);
+              console.log(
+                `[Generation] Puzzle ${i + 1} score ${difficultyScore.score} does not meet target ${targetDifficulty}, regenerating...`,
+              );
               result.regeneratedPuzzles++;
               continue; // Regenerate this puzzle
             }
@@ -212,14 +313,18 @@ export class GenerationService {
             // Log warning if puzzle doesn't meet target but was saved anyway (last attempt)
             if (!meetsTarget) {
               result.warnings.push(
-                `Puzzle ${i + 1} scored ${difficultyScore.score} (${difficultyScore.label}) but target was ${targetDifficulty}. Saved after ${attempts} attempts.`
+                `Puzzle ${i + 1} scored ${difficultyScore.score} (${difficultyScore.label}) but target was ${targetDifficulty}. Saved after ${attempts} attempts.`,
               );
             }
-
           } catch (error: any) {
             if (attempts >= maxRegenerationAttempts) {
               result.errors.push(
-                "Puzzle " + (i + 1) + " generation failed after " + maxRegenerationAttempts + " attempts: " + error.message,
+                "Puzzle " +
+                  (i + 1) +
+                  " generation failed after " +
+                  maxRegenerationAttempts +
+                  " attempts: " +
+                  error.message,
               );
               result.failedPuzzles++;
             }
@@ -242,6 +347,8 @@ export class GenerationService {
           qualityScore: this.calculateQualityScore(result),
         },
       });
+      // Also set the quality score on the result object
+      result.qualityScore = this.calculateQualityScore(result);
 
       // Generate quality report
       try {
@@ -249,11 +356,16 @@ export class GenerationService {
         await QualityReportService.generateReport(bookId);
         console.log("[Generation] Quality report generated successfully");
       } catch (reportError) {
-        console.error("[Generation] Failed to generate quality report:", reportError);
+        console.error(
+          "[Generation] Failed to generate quality report:",
+          reportError,
+        );
         // Don't fail the generation if report generation fails
       }
 
-      console.log(`[Generation] Book generation complete. Generated: ${result.generatedPuzzles}/${result.totalPuzzles}, Failed: ${result.failedPuzzles}, Regenerated: ${result.regeneratedPuzzles}`);
+      console.log(
+        `[Generation] Book generation complete. Generated: ${result.generatedPuzzles}/${result.totalPuzzles}, Failed: ${result.failedPuzzles}, Regenerated: ${result.regeneratedPuzzles}`,
+      );
 
       return result;
     } catch (error: any) {
@@ -339,19 +451,33 @@ export class GenerationService {
    * Calculate quality score for the book
    */
   private static calculateQualityScore(result: GenerationResult): number {
-    if (result.totalPuzzles === 0) return 0;
+    if (result.totalPuzzles === 0) {
+      console.log(
+        "[Generation] calculateQualityScore: totalPuzzles is 0, returning 0",
+      );
+      return 0;
+    }
 
     const successRate = result.generatedPuzzles / result.totalPuzzles;
     const baseScore = successRate * 100;
-
-    // Deduct for errors
     const errorPenalty = result.errors.length * 2;
     const warningPenalty = result.warnings.length * 0.5;
-
-    return Math.max(
+    const finalScore = Math.max(
       0,
       Math.min(100, baseScore - errorPenalty - warningPenalty),
     );
+
+    console.log("[Generation] calculateQualityScore:", {
+      totalPuzzles: result.totalPuzzles,
+      generatedPuzzles: result.generatedPuzzles,
+      successRate,
+      baseScore,
+      errorPenalty,
+      warningPenalty,
+      finalScore,
+    });
+
+    return finalScore;
   }
 
   /**

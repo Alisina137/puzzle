@@ -71,46 +71,46 @@ export default function CreateBookPage() {
   const puzzleCount = watch('puzzleCount');
 
   const onSubmit = async (data: CreateBookFormData) => {
-    setIsSubmitting(true);
-    setError(null);
+  setIsSubmitting(true);
+  setError(null);
 
-    const toastId = toast.loading('Creating your book...');
+  const toastId = toast.loading('Creating your book...');
 
-    try {
-      const response = await fetch('/api/books', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: data.title,
-          puzzleCount: data.puzzleCount,
-          theme: data.theme,
-          targetAudience: data.targetAudience,
-          difficultyLevel: data.difficultyLevel,
-        }),
-      });
+  try {
+    const response = await fetch('/api/books', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: data.title,
+        puzzleCount: data.puzzleCount,
+        theme: data.theme,
+        targetAudience: data.targetAudience,
+        difficultyLevel: data.difficultyLevel,
+      }),
+    });
 
-      const result = await response.json();
+    const result = await response.json();
 
-      if (!response.ok) {
-        toast.dismiss(toastId);
-        setError(result.error || 'Failed to create book');
-        toast.error(result.error || 'Failed to create book');
-        setIsSubmitting(false);
-        return;
-      }
-
+    if (!response.ok) {
       toast.dismiss(toastId);
-      toast.success('Book created successfully! 🎉 Generation started.');
-      
-      router.push('/dashboard');
-    } catch (error) {
-      toast.dismiss(toastId);
-      setError('Something went wrong. Please try again.');
-      toast.error('Something went wrong. Please try again.');
+      setError(result.error || 'Failed to create book');
+      toast.error(result.error || 'Failed to create book');
       setIsSubmitting(false);
+      return;
     }
-  };
 
+    toast.dismiss(toastId);
+    toast.success('Book created successfully! 🎉 Generation started.');
+    
+    // Redirect to My Books page instead of dashboard
+    router.push('/books');
+  } catch (error) {
+    toast.dismiss(toastId);
+    setError('Something went wrong. Please try again.');
+    toast.error('Something went wrong. Please try again.');
+    setIsSubmitting(false);
+  }
+};
   return (
     <DashboardLayout>
       <div className="max-w-3xl mx-auto">

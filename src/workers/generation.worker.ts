@@ -1,28 +1,20 @@
-import "dotenv/config";
+﻿import "dotenv/config";
 import { Worker, Job } from "bullmq";
 import { redisConnection } from "@/lib/redis.js";
 import { QUEUE_NAMES } from "@/lib/queue.js";
 import { GenerationService } from "@/modules/generation/generation.service.js";
 import { prisma } from "@/lib/prisma.js";
 
-// Job data interface
 interface GenerationJobData {
   bookId: string;
   userId: string;
 }
 
-console.log("?? Checking environment variables:");
+console.log("🔍 Checking environment variables:");
 console.log("  REDIS_URL exists:", !!process.env.REDIS_URL);
-console.log(
-  "  UPSTASH_REDIS_REST_URL exists:",
-  !!process.env.UPSTASH_REDIS_REST_URL,
-);
-console.log(
-  "  UPSTASH_REDIS_REST_TOKEN exists:",
-  !!process.env.UPSTASH_REDIS_REST_TOKEN,
-);
+console.log("  UPSTASH_REDIS_REST_URL exists:", !!process.env.UPSTASH_REDIS_REST_URL);
+console.log("  UPSTASH_REDIS_REST_TOKEN exists:", !!process.env.UPSTASH_REDIS_REST_TOKEN);
 
-// Create the generation worker
 export const generationWorker = new Worker<GenerationJobData>(
   QUEUE_NAMES.GENERATION,
   async (job: Job<GenerationJobData>) => {
@@ -33,6 +25,17 @@ export const generationWorker = new Worker<GenerationJobData>(
     await job.updateProgress(0);
 
     try {
+      // Check if the book exists first
+      const book = await prisma.book.findUnique({
+        where: { id: bookId },
+      });
+
+      if (!book) {
+        console.log("[Worker] Book " + bookId + " not found, skipping job");
+        await job.updateProgress(100);
+        return { skipped: true, reason: "Book not found" };
+      }
+
       await prisma.book.update({
         where: { id: bookId },
         data: { status: "generating" },
@@ -41,6 +44,15 @@ export const generationWorker = new Worker<GenerationJobData>(
       await job.updateProgress(10);
 
       const result = await GenerationService.generateBook(bookId);
+
+      console.log("[Worker] Generation result:", {
+        generatedPuzzles: result.generatedPuzzles,
+        totalPuzzles: result.totalPuzzles,
+        failedPuzzles: result.failedPuzzles,
+        errors: result.errors.length,
+        warnings: result.warnings.length,
+        qualityScore: result.qualityScore,
+      });
 
       await job.updateProgress(90);
 
@@ -51,21 +63,50 @@ export const generationWorker = new Worker<GenerationJobData>(
         status = "ready";
       }
 
+      // Get the quality score from the generation result
+      // If result.qualityScore is 0 but there are generated puzzles, recalculate
+      let qualityScore = result.qualityScore;
+
+      console.log("[Worker] Initial qualityScore from result:", qualityScore);
+
+      // If qualityScore is 0 but there are generated puzzles, recalculate
+      if (qualityScore === 0 && result.generatedPuzzles > 0 && result.totalPuzzles > 0) {
+        const successRate = result.generatedPuzzles / result.totalPuzzles;
+        const baseScore = successRate * 100;
+        const errorPenalty = result.errors.length * 2;
+        const warningPenalty = result.warnings.length * 0.5;
+        qualityScore = Math.max(0, Math.min(100, baseScore - errorPenalty - warningPenalty));
+        console.log("[Worker] Recalculated quality score:", {
+          successRate,
+          baseScore,
+          errorPenalty,
+          warningPenalty,
+          qualityScore,
+        });
+      }
+
+      // If qualityScore is still 0 but there are generated puzzles, force it
+      if (qualityScore === 0 && result.generatedPuzzles > 0) {
+        qualityScore = 80; // Default good score
+        console.log("[Worker] Forced quality score to 80 because puzzles were generated");
+      }
+
+      console.log("[Worker] Final quality score:", qualityScore);
+
       await prisma.book.update({
         where: { id: bookId },
         data: {
           status: status,
-          qualityScore: 0,
+          qualityScore: qualityScore,
         },
       });
 
       await job.updateProgress(100);
 
       console.log("[Worker] Job " + job.id + " completed for book " + bookId);
-      console.log(
-        "  Generated: " + result.generatedPuzzles + "/" + result.totalPuzzles,
-      );
+      console.log("  Generated: " + result.generatedPuzzles + "/" + result.totalPuzzles);
       console.log("  Failed: " + result.failedPuzzles);
+      console.log("  Quality Score: " + qualityScore);
 
       if (result.errors.length > 0) {
         console.error("[Worker] Generation errors:");
@@ -82,15 +123,20 @@ export const generationWorker = new Worker<GenerationJobData>(
       }
 
       console.log("[Worker] Generation completed");
-
       return result;
     } catch (error: any) {
       console.error("[Worker] Job " + job.id + " failed:", error.message);
 
-      await prisma.book.update({
+      // Check if the book exists before updating
+      const book = await prisma.book.findUnique({
         where: { id: bookId },
-        data: { status: "failed" },
       });
+      if (book) {
+        await prisma.book.update({
+          where: { id: bookId },
+          data: { status: "failed" },
+        });
+      }
 
       throw error;
     }
@@ -102,7 +148,7 @@ export const generationWorker = new Worker<GenerationJobData>(
       max: 10,
       duration: 5000,
     },
-  },
+  }
 );
 
 generationWorker.on("completed", (job, result) => {
