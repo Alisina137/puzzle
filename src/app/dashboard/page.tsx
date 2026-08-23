@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { useAuth } from '@/hooks/useAuth';
@@ -6,6 +6,7 @@ import { BookOpen, PlusCircle, TrendingUp } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { FadeIn, StaggerContainer, StaggerItem } from '@/components/ui/animations';
+import { DashboardStatSkeleton } from '@/components/ui/Skeleton';
 
 interface DashboardStats {
   totalBooks: number;
@@ -30,7 +31,7 @@ export default function DashboardPage() {
           const result = await response.json();
           const books = result.data?.books || [];
           const totalPuzzles = books.reduce((sum: number, book: any) => sum + book.puzzleCount, 0);
-          
+
           setStats({
             totalBooks: books.length,
             totalPuzzles: totalPuzzles,
@@ -58,7 +59,7 @@ export default function DashboardPage() {
         <FadeIn>
           <div>
             <h1 className="text-2xl font-bold text-gray-800">
-              Welcome back, {user?.name || 'User'}! ??
+              Welcome back, {user?.name || 'User'}! 🎉
             </h1>
             <p className="text-gray-500 mt-1">
               Manage your puzzle books and create new ones from here.
@@ -68,26 +69,35 @@ export default function DashboardPage() {
 
         <StaggerContainer staggerDelay={0.1}>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {statItems.map((stat) => {
-              const Icon = stat.icon;
-              return (
-                <StaggerItem key={stat.label}>
-                  <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow">
-                    <div className="flex items-center gap-4">
-                      <div className={'w-12 h-12 rounded-lg bg-gradient-to-br ' + stat.color + ' flex items-center justify-center'}>
-                        <Icon size={24} className="text-white" />
-                      </div>
-                      <div>
-                        <p className="text-2xl font-bold text-gray-800">
-                          {loading ? '...' : stat.value}
-                        </p>
-                        <p className="text-sm text-gray-500">{stat.label}</p>
+            {loading ? (
+              // Show skeleton while loading
+              <>
+                <DashboardStatSkeleton />
+                <DashboardStatSkeleton />
+                <DashboardStatSkeleton />
+              </>
+            ) : (
+              statItems.map((stat) => {
+                const Icon = stat.icon;
+                return (
+                  <StaggerItem key={stat.label}>
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow">
+                      <div className="flex items-center gap-4">
+                        <div className={'w-12 h-12 rounded-lg bg-gradient-to-br ' + stat.color + ' flex items-center justify-center'}>
+                          <Icon size={24} className="text-white" />
+                        </div>
+                        <div>
+                          <p className="text-2xl font-bold text-gray-800">
+                            {stat.value}
+                          </p>
+                          <p className="text-sm text-gray-500">{stat.label}</p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </StaggerItem>
-              );
-            })}
+                  </StaggerItem>
+                );
+              })
+            )}
           </div>
         </StaggerContainer>
 
@@ -116,7 +126,7 @@ export default function DashboardPage() {
         <FadeIn delay={0.3}>
           <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-6 border border-blue-100">
             <h2 className="text-lg font-semibold text-gray-800 mb-2">
-              ?? Getting Started
+              🚀 Getting Started
             </h2>
             <p className="text-gray-600 text-sm">
               Create your first puzzle book by clicking the "Create New Book" button above.

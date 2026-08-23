@@ -17,6 +17,7 @@ import { GenerationProgress } from "@/components/generation/GenerationProgress";
 import { SortablePuzzleList } from "@/components/puzzle/SortablePuzzleList";
 import { PreflightButton } from "@/components/pdf/PreflightButton";
 import { ExportsList, SolutionsExport } from "@/components/export";
+import { BookDetailSkeleton } from "@/components/ui/Skeleton";
 import { toast } from "sonner";
 
 interface BookPuzzle {
@@ -332,8 +333,8 @@ export default function BookPage() {
   if (loading) {
     return (
       <DashboardLayout>
-        <div className="flex h-64 items-center justify-center">
-          <Loader2 size={32} className="animate-spin text-blue-600" />
+        <div className="max-w-5xl mx-auto">
+          <BookDetailSkeleton />
         </div>
       </DashboardLayout>
     );
