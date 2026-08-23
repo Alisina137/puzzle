@@ -16,7 +16,7 @@ import Link from "next/link";
 import { GenerationProgress } from "@/components/generation/GenerationProgress";
 import { SortablePuzzleList } from "@/components/puzzle/SortablePuzzleList";
 import { PreflightButton } from "@/components/pdf/PreflightButton";
-import { ExportsList } from "@/components/export/ExportsList";
+import { ExportsList, SolutionsExport } from "@/components/export";
 import { toast } from "sonner";
 
 interface BookPuzzle {
@@ -426,6 +426,8 @@ export default function BookPage() {
                     </>
                   )}
                 </button>
+
+                <SolutionsExport bookId={bookId} />
               </>
             )}
 
