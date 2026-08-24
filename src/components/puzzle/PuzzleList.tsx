@@ -68,7 +68,7 @@ export function PuzzleList({
           puzzle={puzzle}
           bookId={bookId}
           onRegenerate={onRegenerate}
-          onDelete={onDelete}
+          onDelete={onDelete ? () => onDelete(puzzle.id) : undefined}
           onUpdate={onPuzzleUpdate}
         />
       ))}

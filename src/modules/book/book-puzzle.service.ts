@@ -14,9 +14,43 @@ export class BookPuzzleService {
   static async deletePuzzle(
     bookId: string,
     puzzleId: string,
-    userId: string
+    userId: string,
   ): Promise<PuzzleOperationResult> {
     try {
+      console.log("[BookPuzzleService] deletePuzzle called with:", {
+        bookId,
+        puzzleId,
+        userId,
+      });
+
+      // Check if the puzzle exists in the Puzzle table
+      const puzzleExists = await prisma.puzzle.findUnique({
+        where: { id: puzzleId },
+      });
+      console.log(
+        "[BookPuzzleService] Puzzle exists in Puzzle table:",
+        puzzleExists ? "Yes" : "No",
+      );
+
+      // Check all bookPuzzle entries for this book
+      const allBookPuzzles = await prisma.bookPuzzle.findMany({
+        where: { bookId },
+        select: { puzzleId: true, displayNumber: true },
+      });
+      console.log(
+        "[BookPuzzleService] All bookPuzzles in this book:",
+        allBookPuzzles,
+      );
+
+      // Find the specific bookPuzzle
+      const bookPuzzle = await prisma.bookPuzzle.findFirst({
+        where: {
+          bookId,
+          puzzleId,
+        },
+      });
+      console.log("[BookPuzzleService] Found bookPuzzle:", bookPuzzle);
+
       // Verify book ownership
       const book = await prisma.book.findUnique({
         where: { id: bookId },
@@ -37,14 +71,6 @@ export class BookPuzzleService {
           bookId,
         };
       }
-
-      // Find the bookPuzzle entry
-      const bookPuzzle = await prisma.bookPuzzle.findFirst({
-        where: {
-          bookId,
-          puzzleId,
-        },
-      });
 
       if (!bookPuzzle) {
         return {
@@ -100,7 +126,8 @@ export class BookPuzzleService {
       console.error("[BookPuzzleService] Error deleting puzzle:", error);
       return {
         success: false,
-        message: error instanceof Error ? error.message : "Failed to delete puzzle",
+        message:
+          error instanceof Error ? error.message : "Failed to delete puzzle",
         bookId,
         puzzleId,
       };
@@ -113,7 +140,7 @@ export class BookPuzzleService {
   static async deletePuzzles(
     bookId: string,
     puzzleIds: string[],
-    userId: string
+    userId: string,
   ): Promise<PuzzleOperationResult> {
     try {
       let deletedCount = 0;
@@ -134,7 +161,8 @@ export class BookPuzzleService {
       console.error("[BookPuzzleService] Error deleting puzzles:", error);
       return {
         success: false,
-        message: error instanceof Error ? error.message : "Failed to delete puzzles",
+        message:
+          error instanceof Error ? error.message : "Failed to delete puzzles",
         bookId,
       };
     }
@@ -145,7 +173,7 @@ export class BookPuzzleService {
    */
   static async getPuzzleWithBook(
     puzzleId: string,
-    userId?: string
+    userId?: string,
   ): Promise<any | null> {
     try {
       const bookPuzzle = await prisma.bookPuzzle.findFirst({
@@ -166,7 +194,10 @@ export class BookPuzzleService {
 
       return bookPuzzle;
     } catch (error) {
-      console.error("[BookPuzzleService] Error fetching puzzle with book:", error);
+      console.error(
+        "[BookPuzzleService] Error fetching puzzle with book:",
+        error,
+      );
       return null;
     }
   }
@@ -177,7 +208,7 @@ export class BookPuzzleService {
   static async regeneratePuzzle(
     bookId: string,
     puzzleId: string,
-    userId: string
+    userId: string,
   ): Promise<PuzzleOperationResult> {
     try {
       // Verify book ownership
@@ -251,7 +282,10 @@ export class BookPuzzleService {
       console.error("[BookPuzzleService] Error regenerating puzzle:", error);
       return {
         success: false,
-        message: error instanceof Error ? error.message : "Failed to regenerate puzzle",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Failed to regenerate puzzle",
         bookId,
         puzzleId,
       };
@@ -264,7 +298,7 @@ export class BookPuzzleService {
   static async regeneratePuzzles(
     bookId: string,
     puzzleIds: string[],
-    userId: string
+    userId: string,
   ): Promise<PuzzleOperationResult> {
     try {
       let queuedCount = 0;
@@ -285,7 +319,10 @@ export class BookPuzzleService {
       console.error("[BookPuzzleService] Error regenerating puzzles:", error);
       return {
         success: false,
-        message: error instanceof Error ? error.message : "Failed to regenerate puzzles",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Failed to regenerate puzzles",
         bookId,
       };
     }

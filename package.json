@@ -19,8 +19,7 @@
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio",
     "worker": "npx tsx src/workers/generation.worker.ts",
-    "worker:start": "npx tsx start-worker.ts",
-    "dev:all": "concurrently \"npm run dev\" \"npm run worker\""
+    "worker:start": "npx tsx start-worker.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.7.4",

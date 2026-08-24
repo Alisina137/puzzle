@@ -11,6 +11,7 @@ import {
   FileText,
   Eye,
   FileType,
+  PlusCircle,
 } from "lucide-react";
 import Link from "next/link";
 import { GenerationProgress } from "@/components/generation/GenerationProgress";
@@ -69,6 +70,8 @@ export default function BookPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isExportingDOCX, setIsExportingDOCX] = useState(false);
+  const [isAddingPuzzle, setIsAddingPuzzle] = useState(false);
+  const [deletingPuzzleId, setDeletingPuzzleId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!bookId) {
@@ -239,6 +242,72 @@ export default function BookPage() {
       );
     } finally {
       setIsExportingDOCX(false);
+    }
+  };
+
+  const handleAddPuzzle = async () => {
+    if (!book || isAddingPuzzle) return;
+
+    setIsAddingPuzzle(true);
+    const toastId = toast.loading("Generating new puzzle...");
+
+    try {
+      const response = await fetch(`/api/books/${bookId}/puzzles`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to generate puzzle");
+      }
+
+      toast.dismiss(toastId);
+      toast.success("New puzzle generated successfully! 🧩");
+      setRefreshKey((prev) => prev + 1);
+    } catch (error: any) {
+      console.error("Error adding puzzle:", error);
+      toast.dismiss(toastId);
+      toast.error(error.message || "Failed to generate puzzle");
+    } finally {
+      setIsAddingPuzzle(false);
+    }
+  };
+
+  const handleDeletePuzzle = async (
+    puzzleId: string,
+    displayNumber: number,
+  ) => {
+    if (
+      !confirm(`Delete Puzzle #${displayNumber}? This action cannot be undone.`)
+    )
+      return;
+
+    setDeletingPuzzleId(puzzleId);
+    const toastId = toast.loading("Deleting puzzle...");
+
+    try {
+      const response = await fetch(`/api/books/${bookId}/puzzles/${puzzleId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const result = await response.json();
+        throw new Error(result.error || "Failed to delete puzzle");
+      }
+
+      toast.dismiss(toastId);
+      toast.success(`Puzzle #${displayNumber} deleted successfully! 🗑️`);
+      setRefreshKey((prev) => prev + 1);
+    } catch (error: any) {
+      console.error("Error deleting puzzle:", error);
+      toast.dismiss(toastId);
+      toast.error(error.message || "Failed to delete puzzle");
+    } finally {
+      setDeletingPuzzleId(null);
     }
   };
 
@@ -525,10 +594,25 @@ export default function BookPage() {
         <div className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-lg font-semibold text-gray-800">Puzzles</h2>
-
-            <span className="text-sm text-gray-400">
-              {book.bookPuzzles.length} of {book.puzzleCount} generated
-            </span>
+            <div className="flex items-center gap-2">
+              {book.status === "ready" && (
+                <button
+                  onClick={handleAddPuzzle}
+                  disabled={isAddingPuzzle}
+                  className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center gap-1"
+                >
+                  {isAddingPuzzle ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : (
+                    <PlusCircle size={16} />
+                  )}
+                  {isAddingPuzzle ? "Generating..." : "Add Puzzle"}
+                </button>
+              )}
+              <span className="text-sm text-gray-400">
+                {book.bookPuzzles.length} of {book.puzzleCount} generated
+              </span>
+            </div>
           </div>
 
           <SortablePuzzleList
@@ -536,6 +620,8 @@ export default function BookPage() {
             bookId={book.id}
             onReorder={handleReorder}
             onPuzzleUpdate={handlePuzzleUpdate}
+            onDeletePuzzle={handleDeletePuzzle}
+            isDeleting={deletingPuzzleId}
           />
         </div>
 

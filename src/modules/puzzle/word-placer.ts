@@ -19,26 +19,8 @@ export class WordPlacer {
     { dr: -1, dc: 1, name: "up-right" },
   ];
 
-  // Direction groups for better distribution
-  private static readonly DIRECTION_GROUPS = {
-    horizontal: [
-      { dr: 0, dc: 1, name: "right" },
-      { dr: 0, dc: -1, name: "left" },
-    ],
-    vertical: [
-      { dr: 1, dc: 0, name: "down" },
-      { dr: -1, dc: 0, name: "up" },
-    ],
-    diagonal: [
-      { dr: 1, dc: 1, name: "down-right" },
-      { dr: -1, dc: -1, name: "up-left" },
-      { dr: 1, dc: -1, name: "down-left" },
-      { dr: -1, dc: 1, name: "up-right" },
-    ],
-  };
-
   /**
-   * Place words in the grid
+   * Place words in the grid.
    */
   static placeWords(
     grid: string[][],
@@ -46,157 +28,157 @@ export class WordPlacer {
     options: PlacementOptions = {},
   ): PlacementResult {
     const {
-      maxAttempts = 100,
+      maxAttempts = 200,
       allowBackwards = true,
       randomizeDirection = true,
+      directions,
     } = options;
 
-    const placedWords: PlacedWord[] = [];
-    const failedWords: string[] = [];
-    const workingGrid = GridUtils.copyGrid(grid);
-    let totalAttempts = 0;
+    // Use custom directions if provided, otherwise use all 8 directions
+    let availableDirections = directions
+      ? [...directions]
+      : [...this.DIRECTIONS];
 
-    // Sort words by length (longest first for better placement)
-    const sortedWords = [...words].sort((a, b) => b.length - a.length);
+    // Remove duplicates
+    availableDirections = this.uniqueDirections(availableDirections);
 
-    for (const word of sortedWords) {
+    console.log(
+      "[WordPlacer] Using directions:",
+      availableDirections.map((d) => d.name).join(", "),
+    );
+    console.log("[WordPlacer] allowBackwards:", allowBackwards);
+
+    // If backwards is not allowed, filter out backward directions
+    if (!allowBackwards) {
+      const forwardDirections = availableDirections.filter(
+        (d) => d.dr >= 0 && d.dc >= 0,
+      );
+      console.log(
+        "[WordPlacer] Backwards disabled. Using only forward directions:",
+        forwardDirections.map((d) => d.name).join(", "),
+      );
+
+      // If no forward directions left, use all available
+      if (forwardDirections.length > 0) {
+        availableDirections = forwardDirections;
+      }
+    }
+
+    console.log(
+      "[WordPlacer] Final directions:",
+      availableDirections.map((d) => d.name).join(", "),
+    );
+
+    const result: PlacementResult = {
+      grid: GridUtils.copyGrid(grid),
+      placedWords: [],
+      failedWords: [],
+      attempts: 0,
+    };
+
+    const rows = grid.length;
+    const cols = grid[0].length;
+
+    if (rows === 0 || cols === 0) {
+      result.failedWords = [...words];
+      return result;
+    }
+
+    // Track direction usage
+    const usedDirections: Record<string, number> = {};
+    for (const dir of availableDirections) {
+      usedDirections[dir.name] = 0;
+    }
+
+    // Shuffle words for variety
+    const shuffledWords = this.shuffleArray(words);
+
+    for (const word of shuffledWords) {
       let placed = false;
       let attempts = 0;
 
       while (!placed && attempts < maxAttempts) {
         attempts++;
-        totalAttempts++;
+        result.attempts++;
 
-        // Get available directions
-        let directions = this.getAvailableDirections(
-          workingGrid,
-          word,
-          allowBackwards,
-        );
+        // Random starting position
+        const row = Math.floor(Math.random() * rows);
+        const col = Math.floor(Math.random() * cols);
 
-        // Shuffle directions for randomness
-        if (randomizeDirection) {
-          directions = this.shuffleArray(directions);
-        }
+        // Sort directions by usage (least used first)
+        const sortedDirections = [...availableDirections].sort((a, b) => {
+          return (usedDirections[a.name] || 0) - (usedDirections[b.name] || 0);
+        });
 
-        for (const direction of directions) {
-          const positions = this.findValidPositions(
-            workingGrid,
-            word,
-            direction,
-          );
+        // Shuffle for randomness among same usage
+        const shuffledDirections = randomizeDirection
+          ? this.shuffleArray(sortedDirections)
+          : sortedDirections;
 
-          // Shuffle positions for randomness
-          const shuffledPositions = this.shuffleArray(positions);
+        for (const dir of shuffledDirections) {
+          // Calculate the actual start position for this direction
+          let startRow = row;
+          let startCol = col;
 
-          for (const pos of shuffledPositions) {
-            if (
-              this.canPlaceWord(workingGrid, word, pos.row, pos.col, direction)
-            ) {
-              // Place the word
-              this.placeWord(workingGrid, word, pos.row, pos.col, direction);
-              placedWords.push({
-                word,
-                row: pos.row,
-                col: pos.col,
-                direction: direction,
-              });
-              placed = true;
-              break;
-            }
+          // For negative directions, the random position is the END of the word
+          if (dir.dr < 0) {
+            startRow = row - (word.length - 1);
           }
-          if (placed) break;
+          if (dir.dc < 0) {
+            startCol = col - (word.length - 1);
+          }
+
+          // Check bounds
+          if (startRow < 0 || startRow >= rows) continue;
+          if (startCol < 0 || startCol >= cols) continue;
+          if (startRow + (word.length - 1) * dir.dr < 0) continue;
+          if (startRow + (word.length - 1) * dir.dr >= rows) continue;
+          if (startCol + (word.length - 1) * dir.dc < 0) continue;
+          if (startCol + (word.length - 1) * dir.dc >= cols) continue;
+
+          if (this.canPlaceWord(result.grid, word, startRow, startCol, dir)) {
+            this.placeWord(result.grid, word, startRow, startCol, dir);
+            result.placedWords.push({
+              word,
+              row: startRow,
+              col: startCol,
+              direction: dir,
+            });
+            usedDirections[dir.name] = (usedDirections[dir.name] || 0) + 1;
+            placed = true;
+            break;
+          }
         }
       }
 
       if (!placed) {
-        failedWords.push(word);
+        result.failedWords.push(word);
+        console.log(`[WordPlacer] ❌ Failed to place: ${word}`);
       }
     }
 
-    // Fill remaining empty cells with random letters
-    this.fillEmptyCells(workingGrid);
+    // Fill empty cells
+    this.fillEmptyCells(result.grid);
 
-    return {
-      grid: workingGrid,
-      placedWords,
-      failedWords,
-      attempts: totalAttempts,
-    };
+    // Log results
+    const usedDirNames = Object.keys(usedDirections).filter(
+      (k) => usedDirections[k] > 0,
+    );
+    console.log(
+      "[WordPlacer] Direction usage:",
+      JSON.stringify(usedDirections, null, 2),
+    );
+    console.log(
+      "[WordPlacer] Used directions:",
+      usedDirNames.join(", ") || "none",
+    );
+    console.log(
+      `[WordPlacer] Placed: ${result.placedWords.length}/${words.length}, Failed: ${result.failedWords.length}`,
+    );
+
+    return result;
   }
 
-  /**
-   * Get available directions for a word
-   */
-  private static getAvailableDirections(
-    grid: string[][],
-    word: string,
-    allowBackwards: boolean,
-  ): Direction[] {
-    let directions = [...this.DIRECTIONS];
-
-    // If backwards is not allowed, remove left, up, and diagonal opposites
-    if (!allowBackwards) {
-      directions = directions.filter(
-        (d) => !(d.dr < 0 || d.dc < 0 || (d.dr < 0 && d.dc < 0)),
-      );
-    }
-
-    // Filter by grid capacity
-    directions = directions.filter((d) => {
-      const maxRow = grid.length - 1;
-      const maxCol = grid[0].length - 1;
-      const endRow = d.dr * (word.length - 1);
-      const endCol = d.dc * (word.length - 1);
-
-      // Check if word fits in grid
-      if (d.dr > 0 && endRow > maxRow) return false;
-      if (d.dr < 0 && endRow < 0) return false;
-      if (d.dc > 0 && endCol > maxCol) return false;
-      if (d.dc < 0 && endCol < 0) return false;
-
-      return true;
-    });
-
-    return directions;
-  }
-
-  /**
-   * Find valid positions for a word in a direction
-   */
-  private static findValidPositions(
-    grid: string[][],
-    word: string,
-    direction: Direction,
-  ): { row: number; col: number }[] {
-    const positions: { row: number; col: number }[] = [];
-    const rows = grid.length;
-    const cols = grid[0].length;
-    const wordLen = word.length;
-
-    let startRow = 0;
-    let endRow = rows - 1;
-    let startCol = 0;
-    let endCol = cols - 1;
-
-    // Adjust bounds based on direction
-    if (direction.dr > 0) endRow = rows - wordLen;
-    if (direction.dr < 0) startRow = wordLen - 1;
-    if (direction.dc > 0) endCol = cols - wordLen;
-    if (direction.dc < 0) startCol = wordLen - 1;
-
-    for (let r = startRow; r <= endRow; r++) {
-      for (let c = startCol; c <= endCol; c++) {
-        positions.push({ row: r, col: c });
-      }
-    }
-
-    return positions;
-  }
-
-  /**
-   * Check if a word can be placed at a position
-   */
   private static canPlaceWord(
     grid: string[][],
     word: string,
@@ -209,9 +191,12 @@ export class WordPlacer {
     for (let i = 0; i < wordLen; i++) {
       const r = row + i * direction.dr;
       const c = col + i * direction.dc;
-      const cell = grid[r][c];
 
-      // Cell must be empty or match the letter
+      if (r < 0 || r >= grid.length || c < 0 || c >= grid[0].length) {
+        return false;
+      }
+
+      const cell = grid[r][c];
       if (cell !== "" && cell !== word[i]) {
         return false;
       }
@@ -220,9 +205,6 @@ export class WordPlacer {
     return true;
   }
 
-  /**
-   * Place a word in the grid
-   */
   private static placeWord(
     grid: string[][],
     word: string,
@@ -239,15 +221,13 @@ export class WordPlacer {
     }
   }
 
-  /**
-   * Fill empty cells with random letters
-   */
   private static fillEmptyCells(grid: string[][]): void {
     const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-    for (let i = 0; i < grid.length; i++) {
-      for (let j = 0; j < grid[i].length; j++) {
-        if (grid[i][j] === "") {
-          grid[i][j] = letters.charAt(
+
+    for (let row = 0; row < grid.length; row++) {
+      for (let col = 0; col < grid[row].length; col++) {
+        if (grid[row][col] === "") {
+          grid[row][col] = letters.charAt(
             Math.floor(Math.random() * letters.length),
           );
         }
@@ -255,9 +235,20 @@ export class WordPlacer {
     }
   }
 
-  /**
-   * Shuffle an array
-   */
+  private static uniqueDirections(directions: Direction[]): Direction[] {
+    const seen = new Set<string>();
+    const result: Direction[] = [];
+
+    for (const dir of directions) {
+      if (!seen.has(dir.name)) {
+        seen.add(dir.name);
+        result.push(dir);
+      }
+    }
+
+    return result;
+  }
+
   private static shuffleArray<T>(array: T[]): T[] {
     const shuffled = [...array];
     for (let i = shuffled.length - 1; i > 0; i--) {

@@ -19,6 +19,9 @@ CREATE TABLE "books" (
     "theme" VARCHAR(100) NOT NULL,
     "puzzleCount" INTEGER NOT NULL DEFAULT 0,
     "status" TEXT NOT NULL DEFAULT 'pending',
+    "targetAudience" VARCHAR(50),
+    "difficultyLevel" VARCHAR(50),
+    "generationSettings" JSONB,
     "qualityScore" DECIMAL(5,2),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
@@ -32,6 +35,11 @@ CREATE TABLE "puzzles" (
     "type" TEXT NOT NULL DEFAULT 'wordsearch',
     "data" JSONB NOT NULL,
     "difficulty" TEXT DEFAULT 'medium',
+    "difficultyScore" INTEGER DEFAULT 0,
+    "difficultyLabel" VARCHAR(20),
+    "validationStatus" VARCHAR(20),
+    "qualityMetrics" JSONB,
+    "fingerprint" VARCHAR(255),
     "qualityScore" DECIMAL(5,2),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -80,9 +88,14 @@ CREATE TABLE "solutions" (
 CREATE TABLE "themes" (
     "id" TEXT NOT NULL,
     "name" VARCHAR(100) NOT NULL,
-    "category" VARCHAR(50),
+    "categoryId" TEXT,
     "isCustom" BOOLEAN NOT NULL DEFAULT false,
     "wordCount" INTEGER NOT NULL DEFAULT 0,
+    "description" VARCHAR(500),
+    "difficulty" VARCHAR(20),
+    "tags" TEXT[],
+    "usageCount" INTEGER NOT NULL DEFAULT 0,
+    "isPublic" BOOLEAN NOT NULL DEFAULT true,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "themes_pkey" PRIMARY KEY ("id")
@@ -163,6 +176,98 @@ CREATE TABLE "templates" (
     CONSTRAINT "templates_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "custom_word_lists" (
+    "id" TEXT NOT NULL,
+    "name" VARCHAR(100) NOT NULL,
+    "description" TEXT,
+    "words" TEXT[],
+    "isPublic" BOOLEAN NOT NULL DEFAULT false,
+    "userId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "custom_word_lists_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "configuration_templates" (
+    "id" TEXT NOT NULL,
+    "name" VARCHAR(100) NOT NULL,
+    "audience" VARCHAR(50) NOT NULL,
+    "difficulty" VARCHAR(50) NOT NULL,
+    "config" JSONB NOT NULL,
+    "isDefault" BOOLEAN NOT NULL DEFAULT false,
+    "description" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "configuration_templates_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "theme_categories" (
+    "id" TEXT NOT NULL,
+    "name" VARCHAR(100) NOT NULL,
+    "description" TEXT,
+    "icon" VARCHAR(50),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "theme_categories_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "book_quality_reports" (
+    "id" TEXT NOT NULL,
+    "bookId" TEXT NOT NULL,
+    "score" DECIMAL(5,2) NOT NULL,
+    "totalPuzzles" INTEGER NOT NULL,
+    "validPuzzles" INTEGER NOT NULL,
+    "verifiedSolutions" INTEGER NOT NULL,
+    "duplicates" INTEGER NOT NULL,
+    "difficultyConsistency" DECIMAL(5,2),
+    "warnings" JSONB,
+    "recommendations" JSONB,
+    "generatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "book_quality_reports_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "regeneration_requests" (
+    "id" TEXT NOT NULL,
+    "bookId" TEXT NOT NULL,
+    "puzzleId" TEXT NOT NULL,
+    "reason" VARCHAR(255) NOT NULL,
+    "requestedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "processedAt" TIMESTAMP(3),
+    "status" TEXT NOT NULL DEFAULT 'pending',
+    "newPuzzleId" TEXT,
+
+    CONSTRAINT "regeneration_requests_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "kdp_configurations" (
+    "id" TEXT NOT NULL,
+    "bookId" TEXT NOT NULL,
+    "trimSize" VARCHAR(50) NOT NULL,
+    "hasBleed" BOOLEAN NOT NULL DEFAULT false,
+    "marginTop" INTEGER NOT NULL DEFAULT 72,
+    "marginBottom" INTEGER NOT NULL DEFAULT 72,
+    "marginLeft" INTEGER NOT NULL DEFAULT 72,
+    "marginRight" INTEGER NOT NULL DEFAULT 72,
+    "gutter" INTEGER NOT NULL DEFAULT 0,
+    "largePrint" BOOLEAN NOT NULL DEFAULT false,
+    "pageNumbering" BOOLEAN NOT NULL DEFAULT true,
+    "solutionPlacement" TEXT NOT NULL DEFAULT 'end',
+    "includeSolution" BOOLEAN NOT NULL DEFAULT true,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "kdp_configurations_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "users_email_key" ON "users"("email");
 
@@ -173,7 +278,19 @@ CREATE INDEX "books_userId_idx" ON "books"("userId");
 CREATE INDEX "books_status_idx" ON "books"("status");
 
 -- CreateIndex
+CREATE INDEX "books_targetAudience_idx" ON "books"("targetAudience");
+
+-- CreateIndex
+CREATE INDEX "books_difficultyLevel_idx" ON "books"("difficultyLevel");
+
+-- CreateIndex
 CREATE INDEX "puzzles_type_idx" ON "puzzles"("type");
+
+-- CreateIndex
+CREATE INDEX "puzzles_difficultyScore_idx" ON "puzzles"("difficultyScore");
+
+-- CreateIndex
+CREATE INDEX "puzzles_fingerprint_idx" ON "puzzles"("fingerprint");
 
 -- CreateIndex
 CREATE INDEX "puzzle_versions_puzzleId_idx" ON "puzzle_versions"("puzzleId");
@@ -200,6 +317,12 @@ CREATE UNIQUE INDEX "themes_name_key" ON "themes"("name");
 CREATE INDEX "themes_name_idx" ON "themes"("name");
 
 -- CreateIndex
+CREATE INDEX "themes_isPublic_idx" ON "themes"("isPublic");
+
+-- CreateIndex
+CREATE INDEX "themes_categoryId_idx" ON "themes"("categoryId");
+
+-- CreateIndex
 CREATE INDEX "theme_words_themeId_idx" ON "theme_words"("themeId");
 
 -- CreateIndex
@@ -223,6 +346,36 @@ CREATE INDEX "exports_userId_idx" ON "exports"("userId");
 -- CreateIndex
 CREATE INDEX "templates_isDefault_idx" ON "templates"("isDefault");
 
+-- CreateIndex
+CREATE INDEX "custom_word_lists_userId_idx" ON "custom_word_lists"("userId");
+
+-- CreateIndex
+CREATE INDEX "custom_word_lists_isPublic_idx" ON "custom_word_lists"("isPublic");
+
+-- CreateIndex
+CREATE INDEX "configuration_templates_audience_difficulty_idx" ON "configuration_templates"("audience", "difficulty");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "configuration_templates_audience_difficulty_key" ON "configuration_templates"("audience", "difficulty");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "theme_categories_name_key" ON "theme_categories"("name");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "book_quality_reports_bookId_key" ON "book_quality_reports"("bookId");
+
+-- CreateIndex
+CREATE INDEX "book_quality_reports_bookId_idx" ON "book_quality_reports"("bookId");
+
+-- CreateIndex
+CREATE INDEX "regeneration_requests_bookId_idx" ON "regeneration_requests"("bookId");
+
+-- CreateIndex
+CREATE INDEX "regeneration_requests_status_idx" ON "regeneration_requests"("status");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "kdp_configurations_bookId_key" ON "kdp_configurations"("bookId");
+
 -- AddForeignKey
 ALTER TABLE "books" ADD CONSTRAINT "books_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
@@ -242,6 +395,9 @@ ALTER TABLE "book_puzzles" ADD CONSTRAINT "book_puzzles_puzzleVersionId_fkey" FO
 ALTER TABLE "solutions" ADD CONSTRAINT "solutions_bookPuzzleId_fkey" FOREIGN KEY ("bookPuzzleId") REFERENCES "book_puzzles"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "themes" ADD CONSTRAINT "themes_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "theme_categories"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "theme_words" ADD CONSTRAINT "theme_words_themeId_fkey" FOREIGN KEY ("themeId") REFERENCES "themes"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -255,3 +411,18 @@ ALTER TABLE "exports" ADD CONSTRAINT "exports_bookId_fkey" FOREIGN KEY ("bookId"
 
 -- AddForeignKey
 ALTER TABLE "exports" ADD CONSTRAINT "exports_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "custom_word_lists" ADD CONSTRAINT "custom_word_lists_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "book_quality_reports" ADD CONSTRAINT "book_quality_reports_bookId_fkey" FOREIGN KEY ("bookId") REFERENCES "books"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "regeneration_requests" ADD CONSTRAINT "regeneration_requests_bookId_fkey" FOREIGN KEY ("bookId") REFERENCES "books"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "regeneration_requests" ADD CONSTRAINT "regeneration_requests_puzzleId_fkey" FOREIGN KEY ("puzzleId") REFERENCES "puzzles"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "kdp_configurations" ADD CONSTRAINT "kdp_configurations_bookId_fkey" FOREIGN KEY ("bookId") REFERENCES "books"("id") ON DELETE CASCADE ON UPDATE CASCADE;

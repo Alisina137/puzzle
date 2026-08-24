@@ -20,23 +20,6 @@ export interface PDFResult {
   pageCount: number;
 }
 
-interface PuzzleWord {
-  word: string;
-  startRow?: number;
-  startCol?: number;
-  endRow?: number;
-  endCol?: number;
-}
-
-interface PuzzleData {
-  grid?: unknown[][];
-  words?: unknown[];
-}
-
-interface SolutionData {
-  words: PuzzleWord[];
-}
-
 export class PDFGenerator {
   private static readonly DEFAULT_OPTIONS: Required<
     Omit<PDFOptions, "margins">
@@ -56,9 +39,6 @@ export class PDFGenerator {
     },
   };
 
-  /**
-   * Generate a complete PDF for a book.
-   */
   static async generateBookPDF(
     bookId: string,
     options: PDFOptions = {},
@@ -99,518 +79,569 @@ export class PDFGenerator {
       info: {
         Title: book.title,
         Author: "Puzzle Book Generator",
-        Subject: "Puzzle Book",
-        Keywords: "puzzle, word search, book",
-        CreationDate: new Date(),
+        Subject: `${book.puzzleCount} Word Search Puzzles`,
       },
     });
 
-    const buffers: Buffer[] = [];
+    const chunks: Buffer[] = [];
+    doc.on("data", (chunk: Buffer) => chunks.push(chunk));
 
-    doc.on("data", (chunk: Buffer) => {
-      buffers.push(chunk);
-    });
+    let pageCount = 0;
 
-    return new Promise<PDFResult>((resolve, reject) => {
+    // Cover Page
+    pageCount++;
+    this.addCoverPage(doc, book);
+
+    // Each puzzle on its own page
+    for (const bookPuzzle of book.bookPuzzles) {
+      pageCount++;
+      doc.addPage();
+      this.addPuzzlePage(doc, bookPuzzle, bookPuzzle.displayNumber, opts);
+    }
+
+    // Solutions at the back
+    if (opts.includeSolutions && opts.solutionPlacement === "back") {
+      pageCount++;
+      doc.addPage();
+      this.addSolutionsPage(doc, book.bookPuzzles);
+    }
+
+    doc.end();
+
+    return new Promise((resolve) => {
       doc.on("end", () => {
-        try {
-          resolve({
-            buffer: Buffer.concat(buffers),
-            pageCount: doc.bufferedPageRange().count,
-          });
-        } catch (error) {
-          reject(error);
-        }
+        const buffer = Buffer.concat(chunks);
+        resolve({ buffer, pageCount });
       });
-
-      doc.on("error", reject);
-
-      try {
-        // ---------------------------------------------------------
-        // TITLE PAGE
-        // ---------------------------------------------------------
-        this.addTitlePage(doc, book);
-
-        // ---------------------------------------------------------
-        // PUZZLES
-        // ---------------------------------------------------------
-        for (let i = 0; i < book.bookPuzzles.length; i++) {
-          const bookPuzzle = book.bookPuzzles[i];
-          const puzzleNumber = i + 1;
-
-          this.addPuzzlePage(doc, bookPuzzle, puzzleNumber, opts);
-
-          if (
-            opts.includeSolutions &&
-            opts.solutionPlacement === "after" &&
-            bookPuzzle.solution
-          ) {
-            this.addSolutionPage(doc, bookPuzzle, puzzleNumber);
-          }
-        }
-
-        // ---------------------------------------------------------
-        // SOLUTIONS AT BACK
-        // ---------------------------------------------------------
-        if (opts.includeSolutions && opts.solutionPlacement === "back") {
-          this.addSolutionsSection(doc, book.bookPuzzles);
-        }
-
-        doc.end();
-      } catch (error) {
-        reject(error);
-      }
     });
   }
 
-  /**
-   * Add the book title page.
-   */
-  private static addTitlePage(
-    doc: PDFKit.PDFDocument,
-    book: {
-      title: string;
-      theme: string;
-      puzzleCount: number;
-    },
-  ): void {
+  private static addCoverPage(doc: PDFKit.PDFDocument, book: any): void {
     const pageWidth = doc.page.width;
     const pageHeight = doc.page.height;
 
-    const contentX = 72;
-    const contentWidth = pageWidth - 144;
+    this.drawDecorativeBorder(doc, pageWidth, pageHeight);
 
-    doc.font("Helvetica-Bold");
-    doc.fontSize(24);
+    doc
+      .fontSize(36)
+      .font("Helvetica-Bold")
+      .fillColor("#1a1a2e")
+      .text(book.title, 0, 180, {
+        align: "center",
+        width: pageWidth,
+      });
 
-    doc.text(book.title, contentX, pageHeight / 2 - 100, {
+    doc
+      .fontSize(18)
+      .font("Helvetica")
+      .fillColor("#4a4a6a")
+      .text("Word Search Puzzle Book", 0, 240, {
+        align: "center",
+        width: pageWidth,
+      });
+
+    const lineX = pageWidth / 2 - 100;
+    doc
+      .moveTo(lineX, 280)
+      .lineTo(lineX + 200, 280)
+      .strokeColor("#4a4a6a")
+      .lineWidth(2)
+      .stroke();
+
+    const detailsY = 320;
+    doc
+      .fontSize(12)
+      .font("Helvetica")
+      .fillColor("#666")
+      .text(`Theme: ${book.theme}`, 0, detailsY, {
+        align: "center",
+        width: pageWidth,
+      });
+    doc
+      .fontSize(12)
+      .text(`Audience: ${book.targetAudience || "General"}`, 0, detailsY + 25, {
+        align: "center",
+        width: pageWidth,
+      });
+    doc
+      .fontSize(12)
+      .text(
+        `Difficulty: ${book.difficultyLevel || "Medium"}`,
+        0,
+        detailsY + 50,
+        {
+          align: "center",
+          width: pageWidth,
+        },
+      );
+    doc.fontSize(12).text(`Puzzles: ${book.puzzleCount}`, 0, detailsY + 75, {
       align: "center",
-      width: contentWidth,
+      width: pageWidth,
     });
 
-    doc.font("Helvetica");
-    doc.fontSize(14);
-
-    doc.text("A Puzzle Book", contentX, pageHeight / 2 - 60, {
-      align: "center",
-      width: contentWidth,
-    });
-
-    doc.fontSize(12);
-
-    const theme = book.theme
-      ? book.theme.charAt(0).toUpperCase() + book.theme.slice(1)
-      : "General";
-
-    doc.text(`Theme: ${theme}`, contentX, pageHeight / 2 - 30, {
-      align: "center",
-      width: contentWidth,
-    });
-
-    doc.text(`${book.puzzleCount} Puzzles`, contentX, pageHeight / 2, {
-      align: "center",
-      width: contentWidth,
-    });
-
-    doc.fontSize(10);
-
-    doc.text("Generated by Puzzle Book Generator", contentX, pageHeight - 50, {
-      align: "center",
-      width: contentWidth,
-    });
-
-    doc.text(new Date().toLocaleDateString(), contentX, pageHeight - 35, {
-      align: "center",
-      width: contentWidth,
-    });
-
-    doc.addPage();
+    doc
+      .fontSize(10)
+      .font("Helvetica")
+      .fillColor("#aaa")
+      .text(
+        `Generated by Puzzle Book Generator • ${new Date().getFullYear()}`,
+        0,
+        pageHeight - 50,
+        {
+          align: "center",
+          width: pageWidth,
+        },
+      );
   }
 
-  /**
-   * Add a puzzle page.
-   */
   private static addPuzzlePage(
     doc: PDFKit.PDFDocument,
     bookPuzzle: any,
-    puzzleNumber: number,
-    options: PDFOptions,
+    displayNumber: number,
+    opts: any,
   ): void {
-    const data = this.parsePuzzleData(bookPuzzle.puzzle?.data);
+    const pageWidth = doc.page.width;
+    const pageHeight = doc.page.height;
+    const margin = opts.margins.left || 72;
 
-    const grid = this.normalizeGrid(data.grid);
-    const words = this.normalizeWords(data.words);
+    const puzzle = bookPuzzle.puzzle;
+    const puzzleData = puzzle.data as any;
+    const grid = puzzleData?.grid || [];
+    const words = puzzleData?.words || [];
 
-    doc.font("Helvetica-Bold");
-    doc.fontSize(16);
-
-    doc.text(`Puzzle #${puzzleNumber}`, {
-      align: "center",
-    });
-
-    doc.moveDown(0.5);
-
-    doc.font("Helvetica");
-    doc.fontSize(options.fontSize ?? 10);
-
-    if (words.length > 0) {
-      doc.text(`Words to find: ${words.join(", ")}`, {
-        align: "center",
-      });
-    } else {
-      doc.text("Find the hidden words in the puzzle.", {
-        align: "center",
-      });
-    }
-
-    doc.moveDown(0.75);
-
-    this.drawGrid(doc, grid);
-
-    doc.moveDown(0.5);
-
-    doc.font("Helvetica");
-    doc.fontSize(8);
-
-    const difficulty = bookPuzzle.puzzle?.difficulty || "medium";
-
-    doc.text(`Difficulty: ${this.capitalize(String(difficulty))}`, {
-      align: "center",
-    });
-
-    const qualityScore = bookPuzzle.puzzle?.qualityScore;
-
-    if (typeof qualityScore === "number" && Number.isFinite(qualityScore)) {
-      doc.text(`Quality Score: ${qualityScore}/100`, {
-        align: "center",
-      });
-    }
-
-    doc.addPage();
-  }
-
-  /**
-   * Draw a word-search grid.
-   */
-  private static drawGrid(doc: PDFKit.PDFDocument, grid: string[][]): void {
-    if (
-      !Array.isArray(grid) ||
-      grid.length === 0 ||
-      !Array.isArray(grid[0]) ||
-      grid[0].length === 0
-    ) {
-      doc.font("Helvetica");
-      doc.fontSize(10);
-      doc.text("Puzzle grid unavailable.", {
-        align: "center",
-      });
+    if (grid.length === 0) {
+      doc.text("Puzzle data not available", margin, 100);
       return;
     }
 
-    const rowCount = grid.length;
-    const columnCount = grid[0].length;
+    const gridSize = grid.length;
 
-    const cellSize = this.calculateCellSize(doc, rowCount, columnCount);
+    // Puzzle Number
+    doc
+      .fontSize(22)
+      .font("Helvetica-Bold")
+      .fillColor("#1a1a2e")
+      .text(`Puzzle #${displayNumber}`, margin, 50);
 
-    const gridWidth = columnCount * cellSize;
+    // Difficulty badge
+    const difficulty = puzzle.difficultyLabel || puzzle.difficulty || "Medium";
+    const badgeColors: Record<string, string> = {
+      Easy: "#4CAF50",
+      Medium: "#FF9800",
+      Hard: "#F44336",
+      Expert: "#9C27B0",
+    };
+    const badgeColor = badgeColors[difficulty] || "#666";
 
-    const startX = (doc.page.width - gridWidth) / 2;
+    doc
+      .fontSize(10)
+      .font("Helvetica-Bold")
+      .fillColor("white")
+      .rect(pageWidth - margin - 80, 45, 70, 22)
+      .fill(badgeColor);
 
-    const startY = doc.y + 20;
+    doc
+      .fontSize(10)
+      .font("Helvetica-Bold")
+      .fillColor("white")
+      .text(difficulty, pageWidth - margin - 45, 50, {
+        width: 30,
+        align: "center",
+      });
 
-    for (let row = 0; row < rowCount; row++) {
-      for (let column = 0; column < columnCount; column++) {
-        const x = startX + column * cellSize;
-        const y = startY + row * cellSize;
+    // Words List
+    const wordListY = 85;
+    doc
+      .fontSize(11)
+      .font("Helvetica-Bold")
+      .fillColor("#1a1a2e")
+      .text("Words to Find:", margin, wordListY);
 
-        // Cell border
-        doc.rect(x, y, cellSize, cellSize).stroke();
+    let numColumns = 3;
+    if (gridSize >= 15) numColumns = 4;
+    if (gridSize >= 18) numColumns = 4;
+    if (words.length > 30) numColumns = 4;
+    if (words.length < 12) numColumns = 2;
 
-        const letter = grid[row]?.[column] ?? "";
+    const wordStartY = wordListY + 20;
+    const wordsPerColumn = Math.ceil(words.length / numColumns);
+    const columnWidth =
+      (pageWidth - margin * 2 - (numColumns - 1) * 15) / numColumns;
 
-        if (letter !== "") {
-          doc.font("Helvetica-Bold");
+    for (let i = 0; i < words.length; i++) {
+      const col = Math.floor(i / wordsPerColumn);
+      const row = i % wordsPerColumn;
+      const x = margin + col * (columnWidth + 15);
+      const y = wordStartY + row * 18;
 
-          doc.fontSize(Math.min(cellSize * 0.55, 16));
+      let displayWord = words[i];
+      if (displayWord.length > 18) {
+        displayWord = displayWord.substring(0, 15) + "...";
+      }
 
-          // Center the letter inside the cell.
-          const textWidth = doc.widthOfString(letter);
+      doc
+        .fontSize(9)
+        .font("Helvetica")
+        .fillColor("#444")
+        .text(`${i + 1}. ${displayWord}`, x, y, {
+          width: columnWidth - 10,
+        });
+    }
+
+    const totalWordRows = Math.ceil(words.length / numColumns);
+    const wordListHeight = totalWordRows * 18 + 15;
+    let gridStartY = wordStartY + wordListHeight + 15;
+
+    const availableHeight = pageHeight - gridStartY - 50;
+    const availableWidth = pageWidth - margin * 2 - 20;
+
+    let cellSize = Math.min(
+      availableWidth / gridSize,
+      availableHeight / gridSize,
+    );
+
+    if (cellSize < 18) {
+      const reducedHeight =
+        wordStartY + Math.ceil(words.length / numColumns) * 14 + 10;
+      gridStartY = reducedHeight;
+      const newAvailableHeight = pageHeight - gridStartY - 50;
+      cellSize = Math.min(
+        availableWidth / gridSize,
+        newAvailableHeight / gridSize,
+      );
+    }
+
+    cellSize = Math.max(cellSize, 14);
+
+    // ============================================================
+    // GRID WITH LABELS
+    // ============================================================
+    const labelWidth = 24;
+    const labelHeight = 24;
+    const totalGridWidth = cellSize * gridSize + labelWidth;
+    const totalGridHeight = cellSize * gridSize + labelHeight;
+    const gridStartX = (pageWidth - totalGridWidth) / 2;
+    const gridStartYFinal = gridStartY;
+
+    // Top row background
+    doc
+      .rect(
+        gridStartX + labelWidth,
+        gridStartYFinal,
+        cellSize * gridSize,
+        labelHeight,
+      )
+      .fill("#f5f5f5");
+
+    // Left column background
+    doc
+      .rect(
+        gridStartX,
+        gridStartYFinal + labelHeight,
+        labelWidth,
+        cellSize * gridSize,
+      )
+      .fill("#f5f5f5");
+
+    // Column labels (numbers)
+    // Column labels (numbers)
+    doc.fontSize(9).font("Helvetica-Bold").fillColor("#666");
+
+    for (let c = 0; c < gridSize; c++) {
+      const x = gridStartX + labelWidth + c * cellSize;
+      const y = gridStartYFinal;
+      const labelText = String(c + 1);
+
+      const textWidth = doc.widthOfString(labelText);
+      const textHeight = doc.currentLineHeight(true);
+
+      const textX = x + (cellSize - textWidth) / 2;
+      const textY = y + (labelHeight - textHeight) / 2;
+
+      doc.text(labelText, textX, textY, {
+        width: textWidth,
+        height: textHeight,
+        align: "center",
+        lineBreak: false,
+      });
+    }
+
+    // Row labels (letters)
+    doc.fontSize(9).font("Helvetica-Bold").fillColor("#666");
+
+    for (let r = 0; r < gridSize; r++) {
+      const x = gridStartX;
+      const y = gridStartYFinal + labelHeight + r * cellSize;
+      const letter = String.fromCharCode(65 + r);
+
+      const textHeight = doc.currentLineHeight(true);
+
+      // Full row-label cell
+      const textY = y + (cellSize - textHeight) / 2;
+
+      doc.text(letter, x, textY, {
+        width: labelWidth,
+        height: textHeight,
+        align: "center",
+        lineBreak: false,
+      });
+    }
+
+    // ============================================================
+    // DRAW GRID CELLS - PERFECTLY CENTERED
+    // ============================================================
+    for (let r = 0; r < gridSize; r++) {
+      for (let c = 0; c < gridSize; c++) {
+        const x = gridStartX + labelWidth + c * cellSize;
+        const y = gridStartYFinal + labelHeight + r * cellSize;
+        const cell = grid[r]?.[c] || "";
+
+        const isDark = (r + c) % 2 === 0;
+        doc.rect(x, y, cellSize, cellSize).fill(isDark ? "#fafafa" : "#f0f0f0");
+
+        doc
+          .rect(x, y, cellSize, cellSize)
+          .strokeColor("#d0d0d0")
+          .lineWidth(0.5)
+          .stroke();
+
+        if (cell) {
+          const fontSize = Math.min(16, cellSize * 0.5);
+
+          doc.fontSize(fontSize).font("Helvetica-Bold").fillColor("#333");
+
+          const textWidth = doc.widthOfString(cell);
+          const textHeight = doc.currentLineHeight(true);
 
           const textX = x + (cellSize - textWidth) / 2;
+          const textY = y + (cellSize - textHeight) / 2;
 
-          const textY = y + (cellSize - doc.currentLineHeight()) / 2 - 1;
-
-          doc.text(letter, textX, textY, {
+          doc.text(cell, textX, textY, {
+            width: textWidth,
+            height: textHeight,
+            align: "center",
             lineBreak: false,
           });
         }
       }
     }
 
-    doc.y = startY + rowCount * cellSize + 20;
-  }
-
-  /**
-   * Calculate a safe grid cell size.
-   */
-  private static calculateCellSize(
-    doc: PDFKit.PDFDocument,
-    rows: number,
-    columns: number,
-  ): number {
-    if (rows <= 0 || columns <= 0) {
-      return 20;
-    }
-
-    const availableWidth =
-      doc.page.width - doc.page.margins.left - doc.page.margins.right;
-
-    const availableHeight =
-      doc.page.height - doc.page.margins.top - doc.page.margins.bottom - 180;
-
-    const sizeByWidth = availableWidth / columns;
-
-    const sizeByHeight = availableHeight / rows;
-
-    return Math.max(10, Math.min(sizeByWidth, sizeByHeight, 32));
-  }
-
-  /**
-   * Add a solution page immediately after a puzzle.
-   */
-  private static addSolutionPage(
-    doc: PDFKit.PDFDocument,
-    bookPuzzle: any,
-    puzzleNumber: number,
-  ): void {
-    const solutionData = this.parseSolutionData(bookPuzzle.solution?.data);
-
-    doc.font("Helvetica-Bold");
-    doc.fontSize(14);
-
-    doc.text(`Solution #${puzzleNumber}`, {
-      align: "center",
-    });
-
-    doc.moveDown(0.75);
-
-    if (solutionData.words.length > 0) {
-      doc.font("Helvetica");
-      doc.fontSize(10);
-
-      for (const word of solutionData.words) {
-        const coordinates = this.formatCoordinates(word);
-
-        doc.text(`${word.word}${coordinates}`, {
-          align: "center",
-        });
-
-        doc.moveDown(0.25);
-      }
-    } else {
-      doc.font("Helvetica");
-      doc.fontSize(10);
-
-      doc.text("No solution information available.", {
+    // Footer
+    doc
+      .fontSize(8)
+      .font("Helvetica")
+      .fillColor("#aaa")
+      .text(`Puzzle #${displayNumber}`, margin, pageHeight - 30, {
+        width: pageWidth - margin * 2,
         align: "center",
       });
-    }
-
-    doc.addPage();
   }
 
-  /**
-   * Add all solutions at the end of the book.
-   */
-  private static addSolutionsSection(
+  private static addSolutionsPage(
     doc: PDFKit.PDFDocument,
     bookPuzzles: any[],
   ): void {
-    doc.font("Helvetica-Bold");
-    doc.fontSize(18);
+    const pageWidth = doc.page.width;
+    const pageHeight = doc.page.height;
+    const margin = 72;
 
-    doc.text("Solutions", {
-      align: "center",
-    });
-
-    doc.moveDown();
-
-    for (let i = 0; i < bookPuzzles.length; i++) {
-      const bookPuzzle = bookPuzzles[i];
-
-      const puzzleNumber = i + 1;
-
-      const solutionData = this.parseSolutionData(bookPuzzle.solution?.data);
-
-      doc.font("Helvetica-Bold");
-      doc.fontSize(12);
-
-      doc.text(`Puzzle #${puzzleNumber}`);
-
-      doc.moveDown(0.25);
-
-      doc.font("Helvetica");
-      doc.fontSize(10);
-
-      if (solutionData.words.length > 0) {
-        for (const word of solutionData.words) {
-          doc.text(`${word.word}${this.formatCoordinates(word)}`);
-        }
-      } else {
-        doc.text("No solution available");
-      }
-
-      doc.moveDown(0.75);
-
-      /*
-       * Prevent solution text from running off the page.
-       */
-      if (doc.y > doc.page.height - doc.page.margins.bottom - 60) {
-        doc.addPage();
-      }
-    }
-
-    doc.addPage();
-  }
-
-  /**
-   * Safely parse Prisma JSON puzzle data.
-   */
-  private static parsePuzzleData(value: unknown): PuzzleData {
-    if (!value || typeof value !== "object" || Array.isArray(value)) {
-      return {};
-    }
-
-    return value as PuzzleData;
-  }
-
-  /**
-   * Convert unknown grid data into string[][].
-   */
-  private static normalizeGrid(value: unknown): string[][] {
-    if (!Array.isArray(value)) {
-      return [];
-    }
-
-    return value
-      .filter(Array.isArray)
-      .map((row) => row.map((cell) => (cell == null ? "" : String(cell))));
-  }
-
-  /**
-   * Convert unknown word data into string[].
-   */
-  private static normalizeWords(value: unknown): string[] {
-    if (!Array.isArray(value)) {
-      return [];
-    }
-
-    return value
-      .map((word) => {
-        if (typeof word === "string") {
-          return word;
-        }
-
-        if (typeof word === "object" && word !== null && "word" in word) {
-          return String((word as { word: unknown }).word);
-        }
-
-        return String(word);
-      })
-      .filter(Boolean);
-  }
-
-  /**
-   * Safely parse Prisma JSON solution data.
-   */
-  private static parseSolutionData(value: unknown): SolutionData {
-    if (!value || typeof value !== "object" || Array.isArray(value)) {
-      return {
-        words: [],
-      };
-    }
-
-    const rawWords = (
-      value as {
-        words?: unknown;
-      }
-    ).words;
-
-    if (!Array.isArray(rawWords)) {
-      return {
-        words: [],
-      };
-    }
-
-    const words: PuzzleWord[] = [];
-
-    for (const item of rawWords) {
-      if (!item || typeof item !== "object") {
-        continue;
-      }
-
-      const raw = item as Record<string, unknown>;
-
-      if (typeof raw.word !== "string") {
-        continue;
-      }
-
-      words.push({
-        word: raw.word,
-        startRow: this.toNumber(raw.startRow),
-        startCol: this.toNumber(raw.startCol),
-        endRow: this.toNumber(raw.endRow),
-        endCol: this.toNumber(raw.endCol),
+    doc
+      .fontSize(28)
+      .font("Helvetica-Bold")
+      .fillColor("#1a1a2e")
+      .text("Solutions", 0, 60, {
+        align: "center",
+        width: pageWidth,
       });
-    }
 
-    return { words };
-  }
+    doc
+      .fontSize(12)
+      .font("Helvetica")
+      .fillColor("#666")
+      .text("Answer key with word positions", 0, 100, {
+        align: "center",
+        width: pageWidth,
+      });
 
-  /**
-   * Format a solution word's coordinates.
-   */
-  private static formatCoordinates(word: PuzzleWord): string {
-    const hasCoordinates =
-      typeof word.startRow === "number" &&
-      typeof word.startCol === "number" &&
-      typeof word.endRow === "number" &&
-      typeof word.endCol === "number";
+    const lineX = pageWidth / 2 - 80;
+    doc
+      .moveTo(lineX, 120)
+      .lineTo(lineX + 160, 120)
+      .strokeColor("#4a4a6a")
+      .lineWidth(1)
+      .stroke();
 
-    if (!hasCoordinates) {
+    let y = 160;
+
+    function getDirectionText(dr: number, dc: number): string {
+      if (dr === 0 && dc > 0) return "Right";
+      else if (dr === 0 && dc < 0) return "Left";
+      else if (dr > 0 && dc === 0) return "Down";
+      else if (dr < 0 && dc === 0) return "Up";
+      else if (dr > 0 && dc > 0) return "Down-Right";
+      else if (dr < 0 && dc < 0) return "Up-Left";
+      else if (dr > 0 && dc < 0) return "Down-Left";
+      else if (dr < 0 && dc > 0) return "Up-Right";
       return "";
     }
 
-    return `: (${word.startRow},${word.startCol}) -> (${word.endRow},${word.endCol})`;
-  }
+    for (const bookPuzzle of bookPuzzles) {
+      const puzzle = bookPuzzle.puzzle;
+      const puzzleData = puzzle.data as any;
+      const words = puzzleData?.words || [];
+      const solution = bookPuzzle.solution?.data as any;
+      const solutionWords = solution?.words || [];
 
-  /**
-   * Safely convert an unknown value to a number.
-   */
-  private static toNumber(value: unknown): number | undefined {
-    if (typeof value === "number" && Number.isFinite(value)) {
-      return value;
-    }
-
-    if (typeof value === "string" && value.trim() !== "") {
-      const parsed = Number(value);
-
-      if (Number.isFinite(parsed)) {
-        return parsed;
+      if (y + 80 > pageHeight - 40) {
+        doc.addPage();
+        y = 60;
       }
-    }
 
-    return undefined;
+      doc
+        .fontSize(16)
+        .font("Helvetica-Bold")
+        .fillColor("#1a1a2e")
+        .text(`Puzzle ${bookPuzzle.displayNumber}`, margin, y);
+      y += 25;
+
+      const wordMap: Record<string, any> = {};
+
+      for (const item of solutionWords) {
+        if (typeof item === "string") {
+          wordMap[item] = null;
+        } else if (item && typeof item === "object") {
+          const word = item.word || item.Word || item.text || "";
+          if (word) {
+            wordMap[word] = {
+              startRow: item.startRow ?? item.startCol ?? 0,
+              startCol: item.startCol ?? 0,
+              endRow: item.endRow ?? item.startRow ?? 0,
+              endCol: item.endCol ?? item.startCol ?? 0,
+              direction: item.direction || "",
+            };
+          }
+        }
+      }
+
+      if (Object.keys(wordMap).length === 0) {
+        for (let i = 0; i < words.length && i < solutionWords.length; i++) {
+          const word = words[i];
+          const item = solutionWords[i];
+          if (typeof item === "object" && item !== null) {
+            wordMap[word] = {
+              startRow: item.startRow ?? 0,
+              startCol: item.startCol ?? 0,
+              endRow: item.endRow ?? item.startRow ?? 0,
+              endCol: item.endCol ?? item.startCol ?? 0,
+              direction: item.direction || "",
+            };
+          } else {
+            wordMap[word] = null;
+          }
+        }
+      }
+
+      for (let i = 0; i < words.length; i++) {
+        const word = words[i];
+        const info = wordMap[word];
+
+        if (y > pageHeight - 40) {
+          doc.addPage();
+          y = 60;
+          doc
+            .fontSize(16)
+            .font("Helvetica-Bold")
+            .fillColor("#1a1a2e")
+            .text(`Puzzle ${bookPuzzle.displayNumber} (cont.)`, margin, y);
+          y += 25;
+        }
+
+        let coordText = "";
+        if (info) {
+          const startRow = info.startRow ?? 0;
+          const startCol = info.startCol ?? 0;
+          const endRow = info.endRow ?? startRow;
+          const endCol = info.endCol ?? startCol;
+
+          const startLetter = String.fromCharCode(65 + startRow);
+          const endLetter = String.fromCharCode(65 + endRow);
+          const startNum = startCol + 1;
+          const endNum = endCol + 1;
+
+          const dr = endRow - startRow;
+          const dc = endCol - startCol;
+          const direction = getDirectionText(dr, dc);
+
+          coordText = `${startLetter}${startNum} → ${endLetter}${endNum} (${direction})`;
+        } else {
+          coordText = "—";
+        }
+
+        if (i % 2 === 0) {
+          doc.rect(margin, y - 3, pageWidth - margin * 2, 20).fill("#f8f8f8");
+        }
+
+        doc
+          .fontSize(10)
+          .font(i % 2 === 0 ? "Helvetica-Bold" : "Helvetica")
+          .fillColor("#333")
+          .text(`${i + 1}. ${word}`, margin + 10, y);
+
+        doc
+          .fontSize(9)
+          .font("Helvetica")
+          .fillColor("#666")
+          .text(coordText, margin + 250, y);
+
+        y += 22;
+      }
+
+      y += 15;
+    }
   }
 
-  /**
-   * Capitalize a string.
-   */
-  private static capitalize(value: string): string {
-    if (!value) {
-      return "";
-    }
+  private static drawDecorativeBorder(
+    doc: PDFKit.PDFDocument,
+    width: number,
+    height: number,
+  ): void {
+    const padding = 40;
+    const cornerRadius = 10;
+    const x = padding;
+    const y = padding;
+    const w = width - padding * 2;
+    const h = height - padding * 2;
 
-    return value.charAt(0).toUpperCase() + value.slice(1);
+    doc
+      .roundedRect(x, y, w, h, cornerRadius)
+      .strokeColor("#e0e0e0")
+      .lineWidth(1)
+      .stroke();
+
+    const innerPadding = 15;
+    doc
+      .roundedRect(
+        x + innerPadding,
+        y + innerPadding,
+        w - innerPadding * 2,
+        h - innerPadding * 2,
+        cornerRadius / 2,
+      )
+      .strokeColor("#e8e8e8")
+      .lineWidth(0.5)
+      .dash(4, { space: 4 })
+      .stroke();
+    doc.undash();
+
+    const corners = [
+      [x + innerPadding, y + innerPadding],
+      [x + w - innerPadding, y + innerPadding],
+      [x + innerPadding, y + h - innerPadding],
+      [x + w - innerPadding, y + h - innerPadding],
+    ];
+
+    for (const [cx, cy] of corners) {
+      doc.circle(cx, cy, 3).fill("#d0d0d0").stroke();
+    }
   }
 }

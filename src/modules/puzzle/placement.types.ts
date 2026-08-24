@@ -22,4 +22,5 @@ export interface PlacementOptions {
   maxAttempts?: number;
   allowBackwards?: boolean;
   randomizeDirection?: boolean;
+  directions?: Direction[]; // Added: custom allowed directions
 }

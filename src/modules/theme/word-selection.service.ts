@@ -102,67 +102,78 @@ export class WordSelectionService {
     }
 
     const themeKey = theme as ThemeKey;
-    let allWords = THEME_WORDS[themeKey];
 
-    allWords = allWords.filter(
-      (word) => word.length >= minWordLength && word.length <= maxWordLength,
-    );
+    // Always enforce the configured length limits FIRST.
+    let allWords = THEME_WORDS[themeKey].filter((word) => {
+      const normalizedWord = word.trim().toUpperCase();
 
-    allWords = allWords.filter((word) => !excludeWords.includes(word));
+      return (
+        normalizedWord.length >= minWordLength &&
+        normalizedWord.length <= maxWordLength &&
+        !excludeWords.includes(normalizedWord)
+      );
+    });
 
     if (allWords.length === 0) {
       throw new Error(
-        'No words available for theme "' +
-          theme +
-          '" with the specified criteria',
+        `No words available for theme "${theme}" with word length ` +
+          `${minWordLength}-${maxWordLength}`,
       );
     }
 
-    let selectedWords: string[] = [];
     const wordCount = Math.min(count, allWords.length);
 
-    let shuffled = this.shuffleArray(allWords, seed);
+    const shuffled = this.shuffleArray(allWords, seed);
 
-    switch (difficulty) {
-      case "easy":
-        const easyWords = shuffled.filter(
-          (w) => w.length >= 4 && w.length <= 7,
+    let selectedWords: string[] = [];
+
+    switch (difficulty.toLowerCase()) {
+      case "easy": {
+        // Prefer shorter words, but NEVER exceed maxWordLength.
+        const preferred = shuffled.filter(
+          (word) =>
+            word.length >= Math.max(minWordLength, 4) &&
+            word.length <= Math.min(maxWordLength, 7),
         );
-        selectedWords = easyWords.slice(0, wordCount);
-        if (selectedWords.length < wordCount) {
-          const remaining = shuffled
-            .filter(
-              (w) =>
-                !selectedWords.includes(w) && w.length >= 5 && w.length <= 10,
-            )
-            .slice(0, wordCount - selectedWords.length);
-          selectedWords = [...selectedWords, ...remaining];
-        }
+
+        selectedWords = preferred.slice(0, wordCount);
+
         break;
-      case "hard":
-        const hardWords = shuffled.filter(
-          (w) => w.length >= 8 && w.length <= 15,
+      }
+
+      case "hard": {
+        // Prefer longer words, but NEVER exceed maxWordLength.
+        const preferred = shuffled.filter(
+          (word) =>
+            word.length >= Math.max(minWordLength, 8) &&
+            word.length <= maxWordLength,
         );
-        selectedWords = hardWords.slice(0, wordCount);
-        if (selectedWords.length < wordCount) {
-          const remaining = shuffled
-            .filter(
-              (w) =>
-                !selectedWords.includes(w) && w.length >= 6 && w.length <= 12,
-            )
-            .slice(0, wordCount - selectedWords.length);
-          selectedWords = [...selectedWords, ...remaining];
-        }
+
+        selectedWords = preferred.slice(0, wordCount);
+
         break;
-      default:
+      }
+
+      case "medium":
+      default: {
         selectedWords = shuffled.slice(0, wordCount);
         break;
+      }
     }
 
+    /*
+     * If the preferred difficulty group does not contain enough words,
+     * fill from the already-filtered pool.
+     *
+     * IMPORTANT:
+     * `allWords` has already been restricted to minWordLength/maxWordLength,
+     * so this fallback can NEVER introduce an invalid word.
+     */
     if (selectedWords.length < wordCount) {
       const remaining = shuffled
-        .filter((w) => !selectedWords.includes(w))
+        .filter((word) => !selectedWords.includes(word))
         .slice(0, wordCount - selectedWords.length);
+
       selectedWords = [...selectedWords, ...remaining];
     }
 
