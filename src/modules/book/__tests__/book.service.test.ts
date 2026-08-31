@@ -68,16 +68,22 @@ describe("BookService", () => {
       };
 
       vi.mocked(prisma.user.findUnique).mockResolvedValue(mockUser);
-      vi.mocked(ConfigTemplateService.validateConfig).mockReturnValue({ valid: true, errors: [] });
+      vi.mocked(ConfigTemplateService.validateConfig).mockReturnValue({
+        valid: true,
+        errors: [],
+      });
       vi.mocked(ConfigTemplateService.getRecommendation).mockResolvedValue({
         gridSize: 12,
         wordsPerPuzzle: 14,
+        targetWordsPerPuzzle: 14,
+        minWordsPerPuzzle: 10,
+        maxWordsPerPuzzle: 16,
         minWordLength: 4,
         maxWordLength: 10,
         directions: 6,
         allowReverse: true,
         overlap: "medium",
-        vocabularyLevel: "common",
+        vocabularyLevels: ["simple", "intermediate"], // ✅ CHANGED HERE
       });
       vi.mocked(prisma.book.create).mockResolvedValue(mockBook);
 
@@ -103,7 +109,7 @@ describe("BookService", () => {
       };
 
       await expect(BookService.createBook(userId, data)).rejects.toThrow(
-        "User with ID user-1 not found"
+        "User with ID user-1 not found",
       );
     });
   });

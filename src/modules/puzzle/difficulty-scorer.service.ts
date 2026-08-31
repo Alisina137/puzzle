@@ -6,7 +6,7 @@ export interface DifficultyFactors {
   directions: number;
   allowReverse: boolean;
   overlap: "low" | "medium" | "high";
-  vocabularyLevel: "simple" | "common" | "intermediate" | "advanced";
+  vocabularyLevels: string[]; // ← CHANGED: Array of levels
 }
 
 export interface DifficultyScore {
@@ -30,11 +30,14 @@ export class DifficultyScorer {
   static calculateScore(factors: DifficultyFactors): DifficultyScore {
     const gridSizeScore = this.scoreGridSize(factors.gridSize);
     const wordCountScore = this.scoreWordCount(factors.wordCount);
-    const wordLengthScore = this.scoreWordLength(factors.minWordLength, factors.maxWordLength);
+    const wordLengthScore = this.scoreWordLength(
+      factors.minWordLength,
+      factors.maxWordLength,
+    );
     const directionsScore = this.scoreDirections(factors.directions);
     const reverseScore = this.scoreReverse(factors.allowReverse);
     const overlapScore = this.scoreOverlap(factors.overlap);
-    const vocabularyScore = this.scoreVocabulary(factors.vocabularyLevel);
+    const vocabularyScore = this.scoreVocabulary(factors.vocabularyLevels); // ← CHANGED: Pass array
 
     // Weighted average (some factors matter more than others)
     const totalWeight = 100;
@@ -139,9 +142,51 @@ export class DifficultyScorer {
   }
 
   /**
-   * Score vocabulary difficulty
+   * 🆕 Score vocabulary difficulty based on array of levels
+   * Returns the average score of all levels, weighted toward harder levels
    */
-  private static scoreVocabulary(level: "simple" | "common" | "intermediate" | "advanced"): number {
+  private static scoreVocabulary(levels: string[]): number {
+    if (!levels || levels.length === 0) {
+      return 50; // Default middle score if no levels specified
+    }
+
+    // Map each level to a score
+    const levelScores = levels.map((level) => {
+      const normalizedLevel = level.toLowerCase();
+      switch (normalizedLevel) {
+        case "simple":
+          return 10;
+        case "common":
+          return 35;
+        case "intermediate":
+          return 65;
+        case "hard":
+          return 90;
+        case "advanced":
+          return 90;
+        default:
+          return 50;
+      }
+    });
+
+    // Calculate average score
+    const total = levelScores.reduce((sum, score) => sum + score, 0);
+    const average = total / levelScores.length;
+
+    // If multiple levels are used, slightly increase difficulty
+    // (mixing levels adds complexity)
+    const mixBonus = levels.length > 1 ? Math.min(10, levels.length * 3) : 0;
+
+    return Math.min(100, Math.round(average + mixBonus));
+  }
+
+  /**
+   * 🆕 Legacy method for backward compatibility
+   * ⚠️ DEPRECATED: Use scoreVocabulary(levels: string[]) instead
+   */
+  private static scoreVocabularyLegacy(
+    level: "simple" | "common" | "intermediate" | "advanced",
+  ): number {
     switch (level) {
       case "simple":
         return 10;
@@ -159,7 +204,9 @@ export class DifficultyScorer {
   /**
    * Get difficulty label based on score
    */
-  private static getLabel(score: number): "Easy" | "Medium" | "Hard" | "Expert" {
+  private static getLabel(
+    score: number,
+  ): "Easy" | "Medium" | "Hard" | "Expert" {
     if (score <= 25) return "Easy";
     if (score <= 50) return "Medium";
     if (score <= 75) return "Hard";
@@ -170,14 +217,14 @@ export class DifficultyScorer {
    * Get target score range for a difficulty level
    */
   static getTargetRange(difficulty: string): { min: number; max: number } {
-    switch (difficulty) {
-      case "Easy":
+    switch (difficulty?.toLowerCase()) {
+      case "easy":
         return { min: 0, max: 30 };
-      case "Medium":
+      case "medium":
         return { min: 25, max: 60 };
-      case "Hard":
+      case "hard":
         return { min: 50, max: 80 };
-      case "Expert":
+      case "expert":
         return { min: 70, max: 100 };
       default:
         return { min: 0, max: 100 };

@@ -35,7 +35,17 @@ export class WordSelector {
     }
 
     const themeKey = theme as ThemeKey;
-    let allWords = getThemeWords(themeKey);
+    const themeWords = getThemeWords(themeKey);
+
+    // ✅ Flatten all words from all levels
+    let allWords: string[] = [];
+    const levels = ["simple", "intermediate", "hard"] as const;
+    levels.forEach((level) => {
+      const words = themeWords[level];
+      if (Array.isArray(words)) {
+        allWords = allWords.concat(words);
+      }
+    });
 
     // Filter by word length
     allWords = allWords.filter(
@@ -103,11 +113,22 @@ export class WordSelector {
     }
 
     const themeKey = theme as ThemeKey;
+    const themeWords = getThemeWords(themeKey);
+
+    // ✅ Count all words across all levels
+    let totalCount = 0;
+    const levels = ["simple", "intermediate", "hard"] as const;
+    levels.forEach((level) => {
+      const words = themeWords[level];
+      if (Array.isArray(words)) {
+        totalCount += words.length;
+      }
+    });
 
     return {
       name: themeLabels[themeKey],
       category: themeCategories[themeKey],
-      wordCount: getThemeWords(themeKey).length,
+      wordCount: totalCount,
     };
   }
 
@@ -157,8 +178,19 @@ export class WordSelector {
     }
 
     const themeKey = theme as ThemeKey;
+    const themeWords = getThemeWords(themeKey);
 
-    const words = getThemeWords(themeKey).filter(
+    // ✅ Flatten all words from all levels
+    let allWords: string[] = [];
+    const levels = ["simple", "intermediate", "hard"] as const;
+    levels.forEach((level) => {
+      const words = themeWords[level];
+      if (Array.isArray(words)) {
+        allWords = allWords.concat(words);
+      }
+    });
+
+    const words = allWords.filter(
       (word) => word.length >= minWordLength && word.length <= maxWordLength,
     );
 

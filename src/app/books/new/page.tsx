@@ -1,46 +1,68 @@
-﻿'use client';
+﻿"use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { Loader2, PlusCircle, BookOpen } from 'lucide-react';
-import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { useAuth } from '@/hooks/useAuth';
-import { toast } from 'sonner';
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { Loader2, PlusCircle, BookOpen } from "lucide-react";
+import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { useAuth } from "@/hooks/useAuth";
+import { toast } from "sonner";
 
 const createBookSchema = z.object({
-  title: z.string().min(3, 'Title must be at least 3 characters').max(255, 'Title must be less than 255 characters'),
-  puzzleCount: z.number().int().min(1, 'Must have at least 1 puzzle').max(500, 'Maximum 500 puzzles per book'),
-  theme: z.string().min(1, 'Please select a theme'),
-  targetAudience: z.string().min(1, 'Please select a target audience'),
-  difficultyLevel: z.string().min(1, 'Please select a difficulty level'),
+  title: z
+    .string()
+    .min(3, "Title must be at least 3 characters")
+    .max(255, "Title must be less than 255 characters"),
+  puzzleCount: z
+    .number()
+    .int()
+    .min(1, "Must have at least 1 puzzle")
+    .max(500, "Maximum 500 puzzles per book"),
+  theme: z.string().min(1, "Please select a theme"),
+  targetAudience: z.string().min(1, "Please select a target audience"),
+  difficultyLevel: z.string().min(1, "Please select a difficulty level"),
 });
 
 type CreateBookFormData = z.infer<typeof createBookSchema>;
 
-const themes = [
-  { value: 'animals', label: 'Animals' },
-  { value: 'space', label: 'Space' },
-  { value: 'travel', label: 'Travel' },
-  { value: 'food', label: 'Food' },
-  { value: 'sports', label: 'Sports' },
-];
+// 🆕 Theme type
+interface ThemeOption {
+  value: string;
+  label: string;
+  category: string;
+  wordCount: number;
+}
+
+// 🆕 Fetch themes from the API
+async function fetchThemes(): Promise<ThemeOption[]> {
+  try {
+    const response = await fetch("/api/themes");
+    if (!response.ok) {
+      throw new Error("Failed to fetch themes");
+    }
+    const data = await response.json();
+    return data.themes || [];
+  } catch (error) {
+    console.error("Error fetching themes:", error);
+    return [];
+  }
+}
 
 const audiences = [
-  { value: 'Children', label: '👶 Children' },
-  { value: 'Teenagers', label: '🧑 Teenagers' },
-  { value: 'Adults', label: '👨 Adults' },
-  { value: 'Seniors', label: '👴 Seniors' },
-  { value: 'PuzzleEnthusiasts', label: '🧩 Puzzle Enthusiasts' },
+  { value: "Children", label: "👶 Children" },
+  { value: "Teenagers", label: "🧑 Teenagers" },
+  { value: "Adults", label: "👨 Adults" },
+  { value: "Seniors", label: "👴 Seniors" },
+  { value: "PuzzleEnthusiasts", label: "🧩 Puzzle Enthusiasts" },
 ];
 
 const difficultyLevels = [
-  { value: 'Easy', label: '🟢 Easy' },
-  { value: 'Medium', label: '🟡 Medium' },
-  { value: 'Hard', label: '🔴 Hard' },
-  { value: 'Expert', label: '⚫ Expert' },
+  { value: "Easy", label: "🟢 Easy" },
+  { value: "Medium", label: "🟡 Medium" },
+  { value: "Hard", label: "🔴 Hard" },
+  { value: "Expert", label: "⚫ Expert" },
 ];
 
 const puzzleCountPresets = [10, 25, 50, 100, 200];
@@ -50,6 +72,19 @@ export default function CreateBookPage() {
   const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [themes, setThemes] = useState<ThemeOption[]>([]);
+  const [isLoadingThemes, setIsLoadingThemes] = useState(true);
+
+  // 🆕 Load themes on component mount
+  useEffect(() => {
+    async function loadThemes() {
+      setIsLoadingThemes(true);
+      const themeOptions = await fetchThemes();
+      setThemes(themeOptions);
+      setIsLoadingThemes(false);
+    }
+    loadThemes();
+  }, []);
 
   const {
     register,
@@ -60,57 +95,58 @@ export default function CreateBookPage() {
   } = useForm<CreateBookFormData>({
     resolver: zodResolver(createBookSchema),
     defaultValues: {
-      title: '',
+      title: "",
       puzzleCount: 50,
-      theme: '',
-      targetAudience: '',
-      difficultyLevel: '',
+      theme: "",
+      targetAudience: "",
+      difficultyLevel: "",
     },
   });
 
-  const puzzleCount = watch('puzzleCount');
+  const puzzleCount = watch("puzzleCount");
 
   const onSubmit = async (data: CreateBookFormData) => {
-  setIsSubmitting(true);
-  setError(null);
+    setIsSubmitting(true);
+    setError(null);
 
-  const toastId = toast.loading('Creating your book...');
+    const toastId = toast.loading("Creating your book...");
 
-  try {
-    const response = await fetch('/api/books', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        title: data.title,
-        puzzleCount: data.puzzleCount,
-        theme: data.theme,
-        targetAudience: data.targetAudience,
-        difficultyLevel: data.difficultyLevel,
-      }),
-    });
+    try {
+      const response = await fetch("/api/books", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: data.title,
+          puzzleCount: data.puzzleCount,
+          theme: data.theme,
+          targetAudience: data.targetAudience,
+          difficultyLevel: data.difficultyLevel,
+        }),
+      });
 
-    const result = await response.json();
+      const result = await response.json();
 
-    if (!response.ok) {
+      if (!response.ok) {
+        toast.dismiss(toastId);
+        setError(result.error || "Failed to create book");
+        toast.error(result.error || "Failed to create book");
+        setIsSubmitting(false);
+        return;
+      }
+
       toast.dismiss(toastId);
-      setError(result.error || 'Failed to create book');
-      toast.error(result.error || 'Failed to create book');
-      setIsSubmitting(false);
-      return;
-    }
+      toast.success("Book created successfully! 🎉 Generation started.");
 
-    toast.dismiss(toastId);
-    toast.success('Book created successfully! 🎉 Generation started.');
-    
-    // Redirect to My Books page instead of dashboard
-    router.push('/books');
-  } catch (error) {
-    toast.dismiss(toastId);
-    setError('Something went wrong. Please try again.');
-    toast.error('Something went wrong. Please try again.');
-    setIsSubmitting(false);
-  }
-};
+      // Redirect to My Books page instead of dashboard
+      router.push("/books");
+    } catch (error) {
+      toast.dismiss(toastId);
+      setError("Something went wrong. Please try again.");
+      toast.error("Something went wrong. Please try again.");
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <DashboardLayout>
       <div className="max-w-3xl mx-auto">
@@ -191,7 +227,7 @@ export default function CreateBookPage() {
               </p>
             </div>
 
-            {/* Theme Selection */}
+            {/* Theme Selection - 🆕 Dynamically loaded */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Theme <span className="text-red-500">*</span>
@@ -199,18 +235,25 @@ export default function CreateBookPage() {
               <select
                 {...register("theme")}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                disabled={isSubmitting}
+                disabled={isSubmitting || isLoadingThemes}
               >
-                <option value="">Select a theme...</option>
+                <option value="">
+                  {isLoadingThemes ? "Loading themes..." : "Select a theme..."}
+                </option>
                 {themes.map((theme) => (
                   <option key={theme.value} value={theme.value}>
-                    {theme.label}
+                    {theme.label} ({theme.wordCount} words)
                   </option>
                 ))}
               </select>
               {errors.theme && (
                 <p className="text-red-500 text-sm mt-1">
                   {errors.theme.message}
+                </p>
+              )}
+              {themes.length > 0 && (
+                <p className="text-gray-400 text-xs mt-1">
+                  {themes.length} themes available
                 </p>
               )}
             </div>
@@ -292,8 +335,13 @@ export default function CreateBookPage() {
           <ul className="text-sm text-blue-700 space-y-1">
             <li>📚 Your book will be created and queued for generation</li>
             <li>🧩 Puzzles will be generated in the background</li>
-            <li>📊 You will be redirected to the dashboard where you can track progress</li>
-            <li>✅ Once complete, you can review, regenerate, and reorder puzzles</li>
+            <li>
+              📊 You will be redirected to the dashboard where you can track
+              progress
+            </li>
+            <li>
+              ✅ Once complete, you can review, regenerate, and reorder puzzles
+            </li>
           </ul>
         </div>
       </div>

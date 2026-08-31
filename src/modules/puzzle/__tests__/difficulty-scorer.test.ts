@@ -12,7 +12,7 @@ describe("DifficultyScorer", () => {
         directions: 4,
         allowReverse: false,
         overlap: "low" as const,
-        vocabularyLevel: "simple" as const,
+        vocabularyLevels: ["simple"], // ✅ Changed to array
       };
 
       const result = DifficultyScorer.calculateScore(factors);
@@ -32,7 +32,7 @@ describe("DifficultyScorer", () => {
         directions: 2,
         allowReverse: false,
         overlap: "low" as const,
-        vocabularyLevel: "simple" as const,
+        vocabularyLevels: ["simple"], // ✅ Changed to array
       };
 
       const result = DifficultyScorer.calculateScore(factors);
@@ -48,7 +48,7 @@ describe("DifficultyScorer", () => {
         directions: 8,
         allowReverse: true,
         overlap: "high" as const,
-        vocabularyLevel: "advanced" as const,
+        vocabularyLevels: ["intermediate", "hard"], // ✅ Changed to array
       };
 
       const result = DifficultyScorer.calculateScore(factors);
@@ -64,7 +64,7 @@ describe("DifficultyScorer", () => {
         directions: 4,
         allowReverse: false,
         overlap: "low" as const,
-        vocabularyLevel: "common" as const,
+        vocabularyLevels: ["simple", "intermediate"], // ✅ Changed to array
       };
 
       const largeGrid = {
@@ -75,7 +75,7 @@ describe("DifficultyScorer", () => {
         directions: 4,
         allowReverse: false,
         overlap: "low" as const,
-        vocabularyLevel: "common" as const,
+        vocabularyLevels: ["simple", "intermediate"], // ✅ Changed to array
       };
 
       const smallResult = DifficultyScorer.calculateScore(smallGrid);

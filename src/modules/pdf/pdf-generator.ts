@@ -75,7 +75,7 @@ export class PDFGenerator {
     const doc = new PDFDocument({
       size: opts.pageSize === "A4" ? "A4" : "LETTER",
       margins: opts.margins,
-      autoFirstPage: true,
+      autoFirstPage: false,
       info: {
         Title: book.title,
         Author: "Puzzle Book Generator",
@@ -88,12 +88,14 @@ export class PDFGenerator {
 
     let pageCount = 0;
 
-    // Cover Page
+    // Page 1: Cover Page
     pageCount++;
+    doc.addPage();
     this.addCoverPage(doc, book);
 
-    // Each puzzle on its own page
-    for (const bookPuzzle of book.bookPuzzles) {
+    // Pages 2+: Each puzzle on its own page
+    for (let i = 0; i < book.bookPuzzles.length; i++) {
+      const bookPuzzle = book.bookPuzzles[i];
       pageCount++;
       doc.addPage();
       this.addPuzzlePage(doc, bookPuzzle, bookPuzzle.displayNumber, opts);
@@ -216,147 +218,119 @@ export class PDFGenerator {
 
     const gridSize = grid.length;
 
-    // Puzzle Number
+    // ============================================================
+    // DRAW HEADER
+    // ============================================================
     doc
-      .fontSize(22)
+      .fontSize(14)
       .font("Helvetica-Bold")
       .fillColor("#1a1a2e")
-      .text(`Puzzle #${displayNumber}`, margin, 50);
+      .text(`Puzzle #${displayNumber}`, margin, margin - 20);
 
-    // Difficulty badge
-    const difficulty = puzzle.difficultyLabel || puzzle.difficulty || "Medium";
-    const badgeColors: Record<string, string> = {
-      Easy: "#4CAF50",
-      Medium: "#FF9800",
-      Hard: "#F44336",
-      Expert: "#9C27B0",
-    };
-    const badgeColor = badgeColors[difficulty] || "#666";
+    // ============================================================
+    // DRAW WORDS LIST (top of page)
+    // ============================================================
+    let yPos = margin + 20;
+    const wordsPerColumn = Math.min(3, Math.ceil(words.length / 6));
+    const columnWidth = (pageWidth - margin * 2) / wordsPerColumn;
 
     doc
-      .fontSize(10)
+      .fontSize(9)
       .font("Helvetica-Bold")
-      .fillColor("white")
-      .rect(pageWidth - margin - 80, 45, 70, 22)
-      .fill(badgeColor);
-
-    doc
-      .fontSize(10)
-      .font("Helvetica-Bold")
-      .fillColor("white")
-      .text(difficulty, pageWidth - margin - 45, 50, {
-        width: 30,
-        align: "center",
-      });
-
-    // Words List
-    const wordListY = 85;
-    doc
-      .fontSize(11)
-      .font("Helvetica-Bold")
-      .fillColor("#1a1a2e")
-      .text("Words to Find:", margin, wordListY);
-
-    let numColumns = 3;
-    if (gridSize >= 15) numColumns = 4;
-    if (gridSize >= 18) numColumns = 4;
-    if (words.length > 30) numColumns = 4;
-    if (words.length < 12) numColumns = 2;
-
-    const wordStartY = wordListY + 20;
-    const wordsPerColumn = Math.ceil(words.length / numColumns);
-    const columnWidth =
-      (pageWidth - margin * 2 - (numColumns - 1) * 15) / numColumns;
+      .fillColor("#333")
+      .text("Words:", margin, yPos);
+    yPos += 14;
 
     for (let i = 0; i < words.length; i++) {
-      const col = Math.floor(i / wordsPerColumn);
-      const row = i % wordsPerColumn;
-      const x = margin + col * (columnWidth + 15);
-      const y = wordStartY + row * 18;
-
-      let displayWord = words[i];
-      if (displayWord.length > 18) {
-        displayWord = displayWord.substring(0, 15) + "...";
-      }
+      const col = i % wordsPerColumn;
+      const row = Math.floor(i / wordsPerColumn);
+      const x = margin + col * columnWidth;
+      const y = yPos + row * 13;
 
       doc
-        .fontSize(9)
+        .fontSize(8)
         .font("Helvetica")
         .fillColor("#444")
-        .text(`${i + 1}. ${displayWord}`, x, y, {
-          width: columnWidth - 10,
+        .text(`${i + 1}. ${words[i]}`, x, y, {
+          width: columnWidth - 5,
+          ellipsis: true,
         });
     }
 
-    const totalWordRows = Math.ceil(words.length / numColumns);
-    const wordListHeight = totalWordRows * 18 + 15;
-    let gridStartY = wordStartY + wordListHeight + 15;
+    const totalRows = Math.ceil(words.length / wordsPerColumn);
+    const wordsListHeight = totalRows * 13 + 10;
+    yPos += wordsListHeight + 10;
 
-    const availableHeight = pageHeight - gridStartY - 50;
-    const availableWidth = pageWidth - margin * 2 - 20;
+    // ============================================================
+    // GRID CALCULATION (with labels)
+    // ============================================================
+    const labelSize = 16;
 
-    let cellSize = Math.min(
-      availableWidth / gridSize,
-      availableHeight / gridSize,
+    const availableWidth = pageWidth - margin * 2;
+    const availableHeight = pageHeight - yPos - margin;
+
+    const cellSizeFromWidth = (availableWidth - labelSize) / gridSize;
+    const cellSizeFromHeight = (availableHeight - labelSize) / gridSize;
+
+    let cellSize = Math.min(cellSizeFromWidth, cellSizeFromHeight);
+    cellSize = Math.min(cellSize, 22);
+    cellSize = Math.max(cellSize, 8);
+
+    const finalTotalWidth = labelSize + gridSize * cellSize;
+    const finalTotalHeight = labelSize + gridSize * cellSize;
+
+    const gridStartX = (pageWidth - finalTotalWidth) / 2;
+    const gridStartY = yPos;
+
+    // ============================================================
+    // DRAW GRID WITH LABELS
+    // ============================================================
+    this.drawGridWithLabels(
+      doc,
+      grid,
+      gridSize,
+      gridStartX,
+      gridStartY,
+      cellSize,
+      labelSize,
     );
+  }
 
-    if (cellSize < 18) {
-      const reducedHeight =
-        wordStartY + Math.ceil(words.length / numColumns) * 14 + 10;
-      gridStartY = reducedHeight;
-      const newAvailableHeight = pageHeight - gridStartY - 50;
-      cellSize = Math.min(
-        availableWidth / gridSize,
-        newAvailableHeight / gridSize,
-      );
-    }
-
-    cellSize = Math.max(cellSize, 14);
+  private static drawGridWithLabels(
+    doc: PDFKit.PDFDocument,
+    grid: string[][],
+    gridSize: number,
+    startX: number,
+    startY: number,
+    cellSize: number,
+    labelSize: number,
+  ): void {
+    const labelFontSize = Math.min(9, cellSize * 0.45);
 
     // ============================================================
-    // GRID WITH LABELS
+    // COLUMN LABELS (numbers at top)
     // ============================================================
-    const labelWidth = 24;
-    const labelHeight = 24;
-    const totalGridWidth = cellSize * gridSize + labelWidth;
-    const totalGridHeight = cellSize * gridSize + labelHeight;
-    const gridStartX = (pageWidth - totalGridWidth) / 2;
-    const gridStartYFinal = gridStartY;
-
-    // Top row background
     doc
-      .rect(
-        gridStartX + labelWidth,
-        gridStartYFinal,
-        cellSize * gridSize,
-        labelHeight,
-      )
-      .fill("#f5f5f5");
+      .rect(startX + labelSize, startY, gridSize * cellSize, labelSize)
+      .fill("#e8e8e8");
 
-    // Left column background
     doc
-      .rect(
-        gridStartX,
-        gridStartYFinal + labelHeight,
-        labelWidth,
-        cellSize * gridSize,
-      )
-      .fill("#f5f5f5");
+      .rect(startX + labelSize, startY, gridSize * cellSize, labelSize)
+      .strokeColor("#cccccc")
+      .lineWidth(0.5)
+      .stroke();
 
-    // Column labels (numbers)
-    // Column labels (numbers)
-    doc.fontSize(9).font("Helvetica-Bold").fillColor("#666");
+    doc.fontSize(labelFontSize).font("Helvetica-Bold").fillColor("#333333");
 
     for (let c = 0; c < gridSize; c++) {
-      const x = gridStartX + labelWidth + c * cellSize;
-      const y = gridStartYFinal;
+      const x = startX + labelSize + c * cellSize;
+      const y = startY;
       const labelText = String(c + 1);
 
       const textWidth = doc.widthOfString(labelText);
       const textHeight = doc.currentLineHeight(true);
-
       const textX = x + (cellSize - textWidth) / 2;
-      const textY = y + (labelHeight - textHeight) / 2;
+      const textY = y + (labelSize - textHeight) / 2;
 
       doc.text(labelText, textX, textY, {
         width: textWidth,
@@ -366,21 +340,33 @@ export class PDFGenerator {
       });
     }
 
-    // Row labels (letters)
-    doc.fontSize(9).font("Helvetica-Bold").fillColor("#666");
+    // ============================================================
+    // ROW LABELS (letters on left)
+    // ============================================================
+    doc
+      .rect(startX, startY + labelSize, labelSize, gridSize * cellSize)
+      .fill("#e8e8e8");
+
+    doc
+      .rect(startX, startY + labelSize, labelSize, gridSize * cellSize)
+      .strokeColor("#cccccc")
+      .lineWidth(0.5)
+      .stroke();
+
+    doc.fontSize(labelFontSize).font("Helvetica-Bold").fillColor("#333333");
 
     for (let r = 0; r < gridSize; r++) {
-      const x = gridStartX;
-      const y = gridStartYFinal + labelHeight + r * cellSize;
-      const letter = String.fromCharCode(65 + r);
+      const x = startX;
+      const y = startY + labelSize + r * cellSize;
+      const labelText = String.fromCharCode(65 + r);
 
+      const textWidth = doc.widthOfString(labelText);
       const textHeight = doc.currentLineHeight(true);
-
-      // Full row-label cell
+      const textX = x + (labelSize - textWidth) / 2;
       const textY = y + (cellSize - textHeight) / 2;
 
-      doc.text(letter, x, textY, {
-        width: labelWidth,
+      doc.text(labelText, textX, textY, {
+        width: textWidth,
         height: textHeight,
         align: "center",
         lineBreak: false,
@@ -388,12 +374,12 @@ export class PDFGenerator {
     }
 
     // ============================================================
-    // DRAW GRID CELLS - PERFECTLY CENTERED
+    // GRID CELLS
     // ============================================================
     for (let r = 0; r < gridSize; r++) {
       for (let c = 0; c < gridSize; c++) {
-        const x = gridStartX + labelWidth + c * cellSize;
-        const y = gridStartYFinal + labelHeight + r * cellSize;
+        const x = startX + labelSize + c * cellSize;
+        const y = startY + labelSize + r * cellSize;
         const cell = grid[r]?.[c] || "";
 
         const isDark = (r + c) % 2 === 0;
@@ -406,13 +392,11 @@ export class PDFGenerator {
           .stroke();
 
         if (cell) {
-          const fontSize = Math.min(16, cellSize * 0.5);
-
+          const fontSize = Math.min(12, cellSize * 0.5);
           doc.fontSize(fontSize).font("Helvetica-Bold").fillColor("#333");
 
           const textWidth = doc.widthOfString(cell);
           const textHeight = doc.currentLineHeight(true);
-
           const textX = x + (cellSize - textWidth) / 2;
           const textY = y + (cellSize - textHeight) / 2;
 
@@ -426,15 +410,15 @@ export class PDFGenerator {
       }
     }
 
-    // Footer
+    // Border around entire grid
+    const totalWidth = labelSize + gridSize * cellSize;
+    const totalHeight = labelSize + gridSize * cellSize;
+
     doc
-      .fontSize(8)
-      .font("Helvetica")
-      .fillColor("#aaa")
-      .text(`Puzzle #${displayNumber}`, margin, pageHeight - 30, {
-        width: pageWidth - margin * 2,
-        align: "center",
-      });
+      .rect(startX, startY, totalWidth, totalHeight)
+      .strokeColor("#999999")
+      .lineWidth(1)
+      .stroke();
   }
 
   private static addSolutionsPage(
@@ -445,158 +429,163 @@ export class PDFGenerator {
     const pageHeight = doc.page.height;
     const margin = 72;
 
+    // ============================================================
+    // SOLUTIONS HEADER
+    // ============================================================
     doc
-      .fontSize(28)
+      .fontSize(20)
       .font("Helvetica-Bold")
       .fillColor("#1a1a2e")
-      .text("Solutions", 0, 60, {
+      .text("Solutions", 0, 50, {
         align: "center",
         width: pageWidth,
       });
 
+    const lineX = pageWidth / 2 - 60;
     doc
-      .fontSize(12)
-      .font("Helvetica")
-      .fillColor("#666")
-      .text("Answer key with word positions", 0, 100, {
-        align: "center",
-        width: pageWidth,
-      });
-
-    const lineX = pageWidth / 2 - 80;
-    doc
-      .moveTo(lineX, 120)
-      .lineTo(lineX + 160, 120)
+      .moveTo(lineX, 75)
+      .lineTo(lineX + 120, 75)
       .strokeColor("#4a4a6a")
       .lineWidth(1)
       .stroke();
 
-    let y = 160;
+    let y = 100;
 
-    function getDirectionText(dr: number, dc: number): string {
-      if (dr === 0 && dc > 0) return "Right";
-      else if (dr === 0 && dc < 0) return "Left";
-      else if (dr > 0 && dc === 0) return "Down";
-      else if (dr < 0 && dc === 0) return "Up";
-      else if (dr > 0 && dc > 0) return "Down-Right";
-      else if (dr < 0 && dc < 0) return "Up-Left";
-      else if (dr > 0 && dc < 0) return "Down-Left";
-      else if (dr < 0 && dc > 0) return "Up-Right";
-      return "";
+    // ✅ ARROW ICONS based on direction vector
+    function getDirectionArrow(dr: number, dc: number): string {
+      if (dr === 0 && dc > 0) return "→";
+      else if (dr === 0 && dc < 0) return "←";
+      else if (dr > 0 && dc === 0) return "↓";
+      else if (dr < 0 && dc === 0) return "↑";
+      else if (dr > 0 && dc > 0) return "↘";
+      else if (dr < 0 && dc < 0) return "↖";
+      else if (dr > 0 && dc < 0) return "↙";
+      else if (dr < 0 && dc > 0) return "↗";
+      return "→";
     }
+
+    const wordFontSize = 8;
+    const coordFontSize = 9;
+    const rowHeight = 16;
+    const headerHeight = 22;
 
     for (const bookPuzzle of bookPuzzles) {
       const puzzle = bookPuzzle.puzzle;
       const puzzleData = puzzle.data as any;
       const words = puzzleData?.words || [];
-      const solution = bookPuzzle.solution?.data as any;
-      const solutionWords = solution?.words || [];
 
-      if (y + 80 > pageHeight - 40) {
+      // ✅ Use placedWords directly - this has the correct direction vectors!
+      const placedWords = puzzleData?.placedWords || [];
+
+      // Check if we need a new page
+      const wordsHeight = Math.ceil(words.length / 2) * rowHeight;
+      if (y + headerHeight + wordsHeight + 10 > pageHeight - 40) {
         doc.addPage();
-        y = 60;
+        y = 50;
       }
 
+      // Puzzle header
       doc
-        .fontSize(16)
+        .fontSize(11)
         .font("Helvetica-Bold")
-        .fillColor("#1a1a2e")
+        .fillColor("#333")
         .text(`Puzzle ${bookPuzzle.displayNumber}`, margin, y);
-      y += 25;
+      y += headerHeight;
 
+      // ✅ Build word map from placedWords (with correct dr, dc)
       const wordMap: Record<string, any> = {};
 
-      for (const item of solutionWords) {
-        if (typeof item === "string") {
-          wordMap[item] = null;
-        } else if (item && typeof item === "object") {
-          const word = item.word || item.Word || item.text || "";
-          if (word) {
-            wordMap[word] = {
-              startRow: item.startRow ?? item.startCol ?? 0,
-              startCol: item.startCol ?? 0,
-              endRow: item.endRow ?? item.startRow ?? 0,
-              endCol: item.endCol ?? item.startCol ?? 0,
-              direction: item.direction || "",
-            };
-          }
+      for (const pw of placedWords) {
+        const word = pw.word || "";
+        if (word) {
+          // ✅ Get direction vector from placedWords (NOT from solution)
+          const dr = pw.direction?.dr ?? pw.dr ?? 0;
+          const dc = pw.direction?.dc ?? pw.dc ?? 1;
+          const startRow = pw.startRow ?? pw.row ?? 0;
+          const startCol = pw.startCol ?? pw.col ?? 0;
+          const wordLen = word.length;
+
+          wordMap[word] = {
+            startRow: startRow,
+            startCol: startCol,
+            endRow: startRow + dr * (wordLen - 1),
+            endCol: startCol + dc * (wordLen - 1),
+            dr: dr,
+            dc: dc,
+          };
         }
       }
 
-      if (Object.keys(wordMap).length === 0) {
-        for (let i = 0; i < words.length && i < solutionWords.length; i++) {
-          const word = words[i];
-          const item = solutionWords[i];
-          if (typeof item === "object" && item !== null) {
-            wordMap[word] = {
-              startRow: item.startRow ?? 0,
-              startCol: item.startCol ?? 0,
-              endRow: item.endRow ?? item.startRow ?? 0,
-              endCol: item.endCol ?? item.startCol ?? 0,
-              direction: item.direction || "",
-            };
-          } else {
-            wordMap[word] = null;
-          }
-        }
-      }
+      // ✅ 2-COLUMN LAYOUT
+      const halfWords = Math.ceil(words.length / 2);
+      const col1Width = (pageWidth - margin * 2) / 2 - 10;
 
       for (let i = 0; i < words.length; i++) {
         const word = words[i];
         const info = wordMap[word];
+        const isRightColumn = i >= halfWords;
+        const displayIndex = isRightColumn ? i - halfWords : i;
 
-        if (y > pageHeight - 40) {
+        const colX = isRightColumn ? margin + col1Width + 15 : margin + 5;
+        const rowY = y + displayIndex * rowHeight;
+
+        if (rowY + rowHeight > pageHeight - 30) {
           doc.addPage();
-          y = 60;
+          y = 50;
           doc
-            .fontSize(16)
+            .fontSize(11)
             .font("Helvetica-Bold")
-            .fillColor("#1a1a2e")
+            .fillColor("#333")
             .text(`Puzzle ${bookPuzzle.displayNumber} (cont.)`, margin, y);
-          y += 25;
+          y += headerHeight;
+          const newRowY = y + displayIndex * rowHeight;
+          if (newRowY + rowHeight > pageHeight - 30) {
+            continue;
+          }
         }
 
+        // ✅ Format coordinate: K3 - L4 → (with arrow icon)
         let coordText = "";
-        if (info) {
-          const startRow = info.startRow ?? 0;
-          const startCol = info.startCol ?? 0;
-          const endRow = info.endRow ?? startRow;
-          const endCol = info.endCol ?? startCol;
+        if (info && info.dr !== undefined && info.dc !== undefined) {
+          const startLetter = String.fromCharCode(65 + (info.startRow ?? 0));
+          const endLetter = String.fromCharCode(
+            65 + (info.endRow ?? info.startRow ?? 0),
+          );
+          const startNum = (info.startCol ?? 0) + 1;
+          const endNum = (info.endCol ?? info.startCol ?? 0) + 1;
+          const arrow = getDirectionArrow(info.dr, info.dc);
 
-          const startLetter = String.fromCharCode(65 + startRow);
-          const endLetter = String.fromCharCode(65 + endRow);
-          const startNum = startCol + 1;
-          const endNum = endCol + 1;
-
-          const dr = endRow - startRow;
-          const dc = endCol - startCol;
-          const direction = getDirectionText(dr, dc);
-
-          coordText = `${startLetter}${startNum} → ${endLetter}${endNum} (${direction})`;
+          // ✅ Use proper arrow (→, ←, ↓, ↑, ↘, ↖, ↙, ↗)
+          coordText = `${startLetter}${startNum} → ${endLetter}${endNum} ${arrow}`;
         } else {
-          coordText = "—";
+          coordText = `${word} →`;
         }
 
-        if (i % 2 === 0) {
-          doc.rect(margin, y - 3, pageWidth - margin * 2, 20).fill("#f8f8f8");
-        }
-
+        // ✅ Draw word
+        const wordText = `${i + 1}. ${word}`;
         doc
-          .fontSize(10)
-          .font(i % 2 === 0 ? "Helvetica-Bold" : "Helvetica")
+          .fontSize(wordFontSize)
+          .font("Helvetica-Bold")
           .fillColor("#333")
-          .text(`${i + 1}. ${word}`, margin + 10, y);
+          .text(wordText, colX, rowY, {
+            width: col1Width - 10,
+            ellipsis: true,
+          });
 
+        // ✅ Draw coordinate with arrow icon
+        const coordX = colX + 120;
         doc
-          .fontSize(9)
+          .fontSize(coordFontSize)
           .font("Helvetica")
           .fillColor("#666")
-          .text(coordText, margin + 250, y);
-
-        y += 22;
+          .text(coordText, coordX, rowY + 1, {
+            width: col1Width - 130,
+            align: "left",
+          });
       }
 
-      y += 15;
+      const totalRows = Math.ceil(words.length / 2);
+      y += totalRows * rowHeight + 8;
     }
   }
 

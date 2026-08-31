@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { ConfigTemplateService } from "@/modules/config";
+import { ConfigTemplateService } from "@/modules/config/config-template.service";
 import { generationQueue } from "@/lib/queue";
 import { Book, Prisma } from "@prisma/client";
 
@@ -32,7 +32,10 @@ export class BookService {
   /**
    * Create a new book with V2 fields
    */
-  static async createBook(userId: string, data: CreateBookInput): Promise<Book> {
+  static async createBook(
+    userId: string,
+    data: CreateBookInput,
+  ): Promise<Book> {
     try {
       console.log("[BookService] Creating book for userId:", userId);
       console.log("[BookService] Data:", JSON.stringify(data, null, 2));
@@ -49,9 +52,13 @@ export class BookService {
 
       // Validate the configuration
       if (data.generationSettings) {
-        const validation = ConfigTemplateService.validateConfig(data.generationSettings);
+        const validation = ConfigTemplateService.validateConfig(
+          data.generationSettings,
+        );
         if (!validation.valid) {
-          throw new Error(`Invalid configuration: ${validation.errors.join(", ")}`);
+          throw new Error(
+            `Invalid configuration: ${validation.errors.join(", ")}`,
+          );
         }
       }
 
@@ -60,7 +67,7 @@ export class BookService {
       if (!generationSettings) {
         const recommendation = await ConfigTemplateService.getRecommendation(
           data.targetAudience,
-          data.difficultyLevel
+          data.difficultyLevel,
         );
         if (recommendation) {
           generationSettings = recommendation;
@@ -98,11 +105,14 @@ export class BookService {
               type: "exponential",
               delay: 5000,
             },
-          }
+          },
         );
         console.log("[BookService] Generation job enqueued for book:", book.id);
       } catch (queueError) {
-        console.error("[BookService] Failed to enqueue generation job:", queueError);
+        console.error(
+          "[BookService] Failed to enqueue generation job:",
+          queueError,
+        );
         // Don't throw - book is created, generation can be retried later
       }
 
@@ -116,7 +126,10 @@ export class BookService {
   /**
    * Get a book by ID with all details
    */
-  static async getBookById(bookId: string, userId?: string): Promise<BookWithDetails | null> {
+  static async getBookById(
+    bookId: string,
+    userId?: string,
+  ): Promise<BookWithDetails | null> {
     try {
       const where: any = { id: bookId };
       if (userId) {
@@ -186,7 +199,11 @@ export class BookService {
   /**
    * Update a book
    */
-  static async updateBook(bookId: string, userId: string, data: UpdateBookInput): Promise<Book | null> {
+  static async updateBook(
+    bookId: string,
+    userId: string,
+    data: UpdateBookInput,
+  ): Promise<Book | null> {
     try {
       // Verify ownership
       const existing = await prisma.book.findUnique({
@@ -199,9 +216,13 @@ export class BookService {
 
       // Validate configuration if provided
       if (data.generationSettings) {
-        const validation = ConfigTemplateService.validateConfig(data.generationSettings);
+        const validation = ConfigTemplateService.validateConfig(
+          data.generationSettings,
+        );
         if (!validation.valid) {
-          throw new Error(`Invalid configuration: ${validation.errors.join(", ")}`);
+          throw new Error(
+            `Invalid configuration: ${validation.errors.join(", ")}`,
+          );
         }
       }
 
@@ -213,7 +234,9 @@ export class BookService {
           puzzleCount: data.puzzleCount,
           targetAudience: data.targetAudience,
           difficultyLevel: data.difficultyLevel,
-          generationSettings: data.generationSettings as Prisma.InputJsonValue | undefined,
+          generationSettings: data.generationSettings as
+            | Prisma.InputJsonValue
+            | undefined,
         },
       });
 
@@ -298,7 +321,7 @@ export class BookService {
 
       return ConfigTemplateService.getRecommendation(
         book.targetAudience,
-        book.difficultyLevel
+        book.difficultyLevel,
       );
     } catch (error) {
       console.error("[BookService] Error getting book recommendation:", error);

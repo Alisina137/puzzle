@@ -3,6 +3,8 @@ import {
   themeLabels,
   themeCategories,
   THEME_WORDS,
+  getWordsByLevel,
+  themeWordCounts,
 } from "./word-lists/index";
 import { prisma } from "@/lib/prisma";
 
@@ -17,6 +19,17 @@ export interface WordSelectionOptions {
   listId?: string;
 }
 
+export interface WordSelectionByLevelOptions {
+  theme: string;
+  count: number;
+  levels: string[];
+  difficulty?: "easy" | "medium" | "hard";
+  excludeWords?: string[];
+  minWordLength?: number;
+  maxWordLength?: number;
+  seed?: number;
+}
+
 export interface WordSelectionResult {
   words: string[];
   theme: string;
@@ -24,27 +37,246 @@ export interface WordSelectionResult {
   totalAvailable: number;
 }
 
+type ThemeWordsStructure = {
+  simple: string[];
+  intermediate: string[];
+  hard: string[];
+};
+
 export class WordSelectionService {
   /**
-   * Get all words for a theme
+   * Get all words for a theme filtered by vocabulary levels
+   */
+  static getThemeWordsByLevel(
+    theme: string,
+    levels: string[] = ["simple"],
+  ): string[] {
+    if (!(theme in THEME_WORDS)) {
+      throw new Error(`Invalid theme: ${theme}`);
+    }
+    const themeKey = theme as ThemeKey;
+    const themeWords = THEME_WORDS[themeKey] as ThemeWordsStructure;
+
+    let allWords: string[] = [];
+    const validLevels = ["simple", "intermediate", "hard"];
+    levels.forEach((level) => {
+      if (validLevels.includes(level)) {
+        const levelKey = level as keyof ThemeWordsStructure;
+        const words = themeWords[levelKey];
+        if (Array.isArray(words)) {
+          allWords = allWords.concat(words);
+        }
+      }
+    });
+
+    return allWords;
+  }
+
+  /**
+   * Get total word count for a theme filtered by vocabulary levels
+   */
+  static getThemeWordCountByLevel(
+    theme: string,
+    levels: string[] = ["simple"],
+  ): number {
+    const words = this.getThemeWordsByLevel(theme, levels);
+    return words.length;
+  }
+
+  /**
+   * Get all words for a theme (legacy)
    */
   static getThemeWords(theme: string): string[] {
     if (!(theme in THEME_WORDS)) {
       throw new Error(`Invalid theme: ${theme}`);
     }
     const themeKey = theme as ThemeKey;
-    return THEME_WORDS[themeKey];
+    const themeWords = THEME_WORDS[themeKey] as ThemeWordsStructure;
+
+    let allWords: string[] = [];
+    const levels = ["simple", "intermediate", "hard"] as const;
+    levels.forEach((level) => {
+      const words = themeWords[level];
+      if (Array.isArray(words)) {
+        allWords = allWords.concat(words);
+      }
+    });
+    return allWords;
   }
 
   /**
-   * Get the total word count for a theme
+   * Get the total word count for a theme (legacy)
    */
   static getThemeWordCount(theme: string): number {
-    if (!(theme in THEME_WORDS)) {
-      return 0;
+    const words = this.getThemeWords(theme);
+    return words.length;
+  }
+
+  /**
+   * 🆕 Select candidate words using intelligent strategy
+   */
+  static selectCandidateWords(
+    eligibleWords: string[],
+    count: number,
+    gridSize: number,
+  ): string[] {
+    if (eligibleWords.length === 0 || count <= 0) {
+      return [];
     }
+
+    // Shuffle for randomness
+    const shuffled = this.shuffleArray([...eligibleWords]);
+
+    // Categorize by length
+    const shortWords = shuffled.filter((w) => w.length <= 6);
+    const mediumWords = shuffled.filter((w) => w.length > 6 && w.length <= 10);
+    const longWords = shuffled.filter((w) => w.length > 10);
+
+    // Calculate distribution: prefer medium words (more flexible for placement)
+    let shortTarget = Math.floor(count * 0.25);
+    let longTarget = Math.floor(count * 0.25);
+    let mediumTarget = count - shortTarget - longTarget;
+
+    // Adjust based on availability
+    shortTarget = Math.min(shortTarget, shortWords.length);
+    longTarget = Math.min(longTarget, longWords.length);
+    mediumTarget = Math.min(mediumTarget, mediumWords.length);
+
+    // If we don't have enough medium words, take from short and long
+    if (shortTarget + mediumTarget + longTarget < count) {
+      const remaining = count - (shortTarget + mediumTarget + longTarget);
+      const remainingPool = shuffled.filter(
+        (w) =>
+          !shortWords.slice(0, shortTarget).includes(w) &&
+          !mediumWords.slice(0, mediumTarget).includes(w) &&
+          !longWords.slice(0, longTarget).includes(w),
+      );
+      const fillWords = this.pickRandom(remainingPool, remaining);
+      const selected = [
+        ...this.pickRandom(shortWords, shortTarget),
+        ...this.pickRandom(mediumWords, mediumTarget),
+        ...this.pickRandom(longWords, longTarget),
+        ...fillWords,
+      ];
+      return selected;
+    }
+
+    return [
+      ...this.pickRandom(shortWords, shortTarget),
+      ...this.pickRandom(mediumWords, mediumTarget),
+      ...this.pickRandom(longWords, longTarget),
+    ];
+  }
+
+  /**
+   * Pick random items from an array
+   */
+  private static pickRandom<T>(array: T[], count: number): T[] {
+    if (array.length === 0 || count <= 0) return [];
+    const shuffled = this.shuffleArray([...array]);
+    return shuffled.slice(0, Math.min(count, shuffled.length));
+  }
+
+  /**
+   * Select words by vocabulary levels
+   */
+  static selectWordsByLevel(
+    options: WordSelectionByLevelOptions,
+  ): WordSelectionResult {
+    const {
+      theme,
+      count,
+      levels = ["simple"],
+      difficulty = "medium",
+      excludeWords = [],
+      minWordLength = 3,
+      maxWordLength = 15,
+      seed,
+    } = options;
+
+    if (!(theme in THEME_WORDS)) {
+      throw new Error(
+        "Invalid theme: " +
+          theme +
+          ". Available themes: " +
+          Object.keys(THEME_WORDS).join(", "),
+      );
+    }
+
     const themeKey = theme as ThemeKey;
-    return THEME_WORDS[themeKey].length;
+    const themeWords = THEME_WORDS[themeKey] as ThemeWordsStructure;
+
+    let levelWords: string[] = [];
+    levels.forEach((level) => {
+      const validLevels = ["simple", "intermediate", "hard"];
+      if (validLevels.includes(level)) {
+        const levelKey = level as keyof ThemeWordsStructure;
+        const words = themeWords[levelKey];
+        if (Array.isArray(words)) {
+          levelWords = levelWords.concat(words);
+        }
+      }
+    });
+
+    let allWords = levelWords.filter((word) => {
+      const normalizedWord = word.trim().toUpperCase();
+      return (
+        normalizedWord.length >= minWordLength &&
+        normalizedWord.length <= maxWordLength &&
+        !excludeWords.includes(normalizedWord)
+      );
+    });
+
+    if (allWords.length === 0) {
+      throw new Error(
+        `No words available for theme "${theme}" with levels "${levels.join(", ")}" ` +
+          `and word length ${minWordLength}-${maxWordLength}`,
+      );
+    }
+
+    const wordCount = Math.min(count, allWords.length);
+    const shuffled = this.shuffleArray(allWords, seed);
+    let selectedWords: string[] = [];
+
+    switch (difficulty.toLowerCase()) {
+      case "easy": {
+        const preferred = shuffled.filter(
+          (word) =>
+            word.length >= Math.max(minWordLength, 4) &&
+            word.length <= Math.min(maxWordLength, 7),
+        );
+        selectedWords = preferred.slice(0, wordCount);
+        break;
+      }
+      case "hard": {
+        const preferred = shuffled.filter(
+          (word) =>
+            word.length >= Math.max(minWordLength, 8) &&
+            word.length <= maxWordLength,
+        );
+        selectedWords = preferred.slice(0, wordCount);
+        break;
+      }
+      case "medium":
+      default: {
+        selectedWords = shuffled.slice(0, wordCount);
+        break;
+      }
+    }
+
+    if (selectedWords.length < wordCount) {
+      const remaining = shuffled
+        .filter((word) => !selectedWords.includes(word))
+        .slice(0, wordCount - selectedWords.length);
+      selectedWords = [...selectedWords, ...remaining];
+    }
+
+    return {
+      words: selectedWords,
+      theme: themeKey,
+      difficulty,
+      totalAvailable: allWords.length,
+    };
   }
 
   /**
@@ -81,6 +313,9 @@ export class WordSelectionService {
     }
   }
 
+  /**
+   * Select words (legacy method)
+   */
   static selectWords(options: WordSelectionOptions): WordSelectionResult {
     const {
       theme,
@@ -102,11 +337,19 @@ export class WordSelectionService {
     }
 
     const themeKey = theme as ThemeKey;
+    const themeWords = THEME_WORDS[themeKey] as ThemeWordsStructure;
 
-    // Always enforce the configured length limits FIRST.
-    let allWords = THEME_WORDS[themeKey].filter((word) => {
+    let allLevelWords: string[] = [];
+    const levels = ["simple", "intermediate", "hard"] as const;
+    levels.forEach((level) => {
+      const words = themeWords[level];
+      if (Array.isArray(words)) {
+        allLevelWords = allLevelWords.concat(words);
+      }
+    });
+
+    let allWords = allLevelWords.filter((word) => {
       const normalizedWord = word.trim().toUpperCase();
-
       return (
         normalizedWord.length >= minWordLength &&
         normalizedWord.length <= maxWordLength &&
@@ -122,38 +365,28 @@ export class WordSelectionService {
     }
 
     const wordCount = Math.min(count, allWords.length);
-
     const shuffled = this.shuffleArray(allWords, seed);
-
     let selectedWords: string[] = [];
 
     switch (difficulty.toLowerCase()) {
       case "easy": {
-        // Prefer shorter words, but NEVER exceed maxWordLength.
         const preferred = shuffled.filter(
           (word) =>
             word.length >= Math.max(minWordLength, 4) &&
             word.length <= Math.min(maxWordLength, 7),
         );
-
         selectedWords = preferred.slice(0, wordCount);
-
         break;
       }
-
       case "hard": {
-        // Prefer longer words, but NEVER exceed maxWordLength.
         const preferred = shuffled.filter(
           (word) =>
             word.length >= Math.max(minWordLength, 8) &&
             word.length <= maxWordLength,
         );
-
         selectedWords = preferred.slice(0, wordCount);
-
         break;
       }
-
       case "medium":
       default: {
         selectedWords = shuffled.slice(0, wordCount);
@@ -161,19 +394,10 @@ export class WordSelectionService {
       }
     }
 
-    /*
-     * If the preferred difficulty group does not contain enough words,
-     * fill from the already-filtered pool.
-     *
-     * IMPORTANT:
-     * `allWords` has already been restricted to minWordLength/maxWordLength,
-     * so this fallback can NEVER introduce an invalid word.
-     */
     if (selectedWords.length < wordCount) {
       const remaining = shuffled
         .filter((word) => !selectedWords.includes(word))
         .slice(0, wordCount - selectedWords.length);
-
       selectedWords = [...selectedWords, ...remaining];
     }
 
@@ -212,10 +436,21 @@ export class WordSelectionService {
       return null;
     }
     const themeKey = theme as ThemeKey;
+    const themeWords = THEME_WORDS[themeKey] as ThemeWordsStructure;
+
+    let totalCount = 0;
+    const levels = ["simple", "intermediate", "hard"] as const;
+    levels.forEach((level) => {
+      const words = themeWords[level];
+      if (Array.isArray(words)) {
+        totalCount += words.length;
+      }
+    });
+
     return {
       name: themeLabels[themeKey],
       category: themeCategories[themeKey],
-      wordCount: THEME_WORDS[themeKey].length,
+      wordCount: totalCount,
     };
   }
 
@@ -226,12 +461,24 @@ export class WordSelectionService {
     wordCount: number;
   }[] {
     const themeKeys = Object.keys(THEME_WORDS) as ThemeKey[];
-    return themeKeys.map((key) => ({
-      key,
-      name: themeLabels[key],
-      category: themeCategories[key],
-      wordCount: THEME_WORDS[key].length,
-    }));
+    return themeKeys.map((key) => {
+      const themeWords = THEME_WORDS[key] as ThemeWordsStructure;
+      let totalCount = 0;
+      const levels = ["simple", "intermediate", "hard"] as const;
+      levels.forEach((level) => {
+        const words = themeWords[level];
+        if (Array.isArray(words)) {
+          totalCount += words.length;
+        }
+      });
+
+      return {
+        key,
+        name: themeLabels[key],
+        category: themeCategories[key],
+        wordCount: totalCount,
+      };
+    });
   }
 
   static hasEnoughWords(
@@ -244,10 +491,21 @@ export class WordSelectionService {
       return false;
     }
     const themeKey = theme as ThemeKey;
-    const words = THEME_WORDS[themeKey].filter(
+    const themeWords = THEME_WORDS[themeKey] as ThemeWordsStructure;
+
+    let allWords: string[] = [];
+    const levels = ["simple", "intermediate", "hard"] as const;
+    levels.forEach((level) => {
+      const words = themeWords[level];
+      if (Array.isArray(words)) {
+        allWords = allWords.concat(words);
+      }
+    });
+
+    const filtered = allWords.filter(
       (word) => word.length >= minWordLength && word.length <= maxWordLength,
     );
-    return words.length >= count;
+    return filtered.length >= count;
   }
 
   private static shuffleArray<T>(array: T[], seed?: number): T[] {

@@ -3,17 +3,22 @@ import { ConfigurationTemplate } from "@prisma/client";
 
 export interface ConfigRecommendation {
   gridSize: number;
+  // Legacy - keep for backward compatibility
   wordsPerPuzzle: number;
+  // New adaptive fields
+  targetWordsPerPuzzle: number;
+  minWordsPerPuzzle: number;
+  maxWordsPerPuzzle: number;
   minWordLength: number;
   maxWordLength: number;
   directions: number;
   allowReverse: boolean;
   overlap: "low" | "medium" | "high";
-  vocabularyLevel: "simple" | "common" | "intermediate" | "advanced";
+  vocabularyLevels: string[];
 }
 
 // Type for template with typed config
-export type TemplateWithConfig = Omit<ConfigurationTemplate, 'config'> & {
+export type TemplateWithConfig = Omit<ConfigurationTemplate, "config"> & {
   config: ConfigRecommendation;
 };
 
@@ -23,7 +28,7 @@ export class ConfigTemplateService {
    */
   static async getTemplate(
     audience: string,
-    difficulty: string
+    difficulty: string,
   ): Promise<TemplateWithConfig | null> {
     try {
       const template = await prisma.configurationTemplate.findFirst({
@@ -37,7 +42,6 @@ export class ConfigTemplateService {
         return null;
       }
 
-      // Type assertion with validation
       return {
         ...template,
         config: template.config as unknown as ConfigRecommendation,
@@ -68,7 +72,10 @@ export class ConfigTemplateService {
         config: template.config as unknown as ConfigRecommendation,
       };
     } catch (error) {
-      console.error("[ConfigTemplateService] Error fetching default template:", error);
+      console.error(
+        "[ConfigTemplateService] Error fetching default template:",
+        error,
+      );
       return null;
     }
   }
@@ -77,7 +84,7 @@ export class ConfigTemplateService {
    * Get all configuration templates for a specific audience
    */
   static async getTemplatesByAudience(
-    audience: string
+    audience: string,
   ): Promise<TemplateWithConfig[]> {
     try {
       const templates = await prisma.configurationTemplate.findMany({
@@ -94,7 +101,10 @@ export class ConfigTemplateService {
         config: template.config as unknown as ConfigRecommendation,
       }));
     } catch (error) {
-      console.error("[ConfigTemplateService] Error fetching templates by audience:", error);
+      console.error(
+        "[ConfigTemplateService] Error fetching templates by audience:",
+        error,
+      );
       return [];
     }
   }
@@ -120,7 +130,10 @@ export class ConfigTemplateService {
         config: template.config as unknown as ConfigRecommendation,
       }));
     } catch (error) {
-      console.error("[ConfigTemplateService] Error fetching all templates:", error);
+      console.error(
+        "[ConfigTemplateService] Error fetching all templates:",
+        error,
+      );
       return [];
     }
   }
@@ -131,16 +144,14 @@ export class ConfigTemplateService {
    */
   static async getRecommendation(
     audience: string,
-    difficulty: string
+    difficulty: string,
   ): Promise<ConfigRecommendation | null> {
     try {
-      // Try to get specific template
       let template = await this.getTemplate(audience, difficulty);
 
-      // Fall back to default if not found
       if (!template) {
         console.warn(
-          `[ConfigTemplateService] No template found for ${audience}/${difficulty}, using default`
+          `[ConfigTemplateService] No template found for ${audience}/${difficulty}, using default`,
         );
         const defaultTemplate = await this.getDefaultTemplate();
         if (!defaultTemplate) {
@@ -152,15 +163,38 @@ export class ConfigTemplateService {
 
       return template.config;
     } catch (error) {
-      console.error("[ConfigTemplateService] Error getting recommendation:", error);
+      console.error(
+        "[ConfigTemplateService] Error getting recommendation:",
+        error,
+      );
       return null;
     }
   }
 
   /**
+   * Get vocabulary levels from a config template
+   */
+  static getVocabularyLevels(template: TemplateWithConfig | null): string[] {
+    if (!template) {
+      return ["simple"];
+    }
+
+    const config = template.config as ConfigRecommendation;
+
+    if (config.vocabularyLevels && Array.isArray(config.vocabularyLevels)) {
+      return config.vocabularyLevels;
+    }
+
+    return ["simple"];
+  }
+
+  /**
    * Validate if a configuration is valid
    */
-  static validateConfig(config: ConfigRecommendation): { valid: boolean; errors: string[] } {
+  static validateConfig(config: ConfigRecommendation): {
+    valid: boolean;
+    errors: string[];
+  } {
     const errors: string[] = [];
 
     if (config.gridSize < 5 || config.gridSize > 25) {
@@ -168,7 +202,29 @@ export class ConfigTemplateService {
     }
 
     if (config.wordsPerPuzzle < 3 || config.wordsPerPuzzle > 30) {
-      errors.push("Words per puzzle must be between 3 and 30");
+      errors.push("wordsPerPuzzle must be between 3 and 30");
+    }
+
+    if (config.targetWordsPerPuzzle < 3 || config.targetWordsPerPuzzle > 30) {
+      errors.push("targetWordsPerPuzzle must be between 3 and 30");
+    }
+
+    if (
+      config.minWordsPerPuzzle < 1 ||
+      config.minWordsPerPuzzle > config.targetWordsPerPuzzle
+    ) {
+      errors.push(
+        "minWordsPerPuzzle must be between 1 and targetWordsPerPuzzle",
+      );
+    }
+
+    if (
+      config.maxWordsPerPuzzle < config.targetWordsPerPuzzle ||
+      config.maxWordsPerPuzzle > 30
+    ) {
+      errors.push(
+        "maxWordsPerPuzzle must be between targetWordsPerPuzzle and 30",
+      );
     }
 
     if (config.minWordLength < 2 || config.minWordLength > 15) {
@@ -176,11 +232,32 @@ export class ConfigTemplateService {
     }
 
     if (config.maxWordLength < config.minWordLength) {
-      errors.push("Max word length must be greater than or equal to min word length");
+      errors.push(
+        "Max word length must be greater than or equal to min word length",
+      );
     }
 
     if (config.directions < 2 || config.directions > 8) {
       errors.push("Directions must be between 2 and 8");
+    }
+
+    if (
+      !config.vocabularyLevels ||
+      !Array.isArray(config.vocabularyLevels) ||
+      config.vocabularyLevels.length === 0
+    ) {
+      errors.push("vocabularyLevels must be a non-empty array");
+    }
+
+    const validLevels = ["simple", "intermediate", "hard"];
+    if (config.vocabularyLevels) {
+      config.vocabularyLevels.forEach((level) => {
+        if (!validLevels.includes(level)) {
+          errors.push(
+            `Invalid vocabulary level: ${level}. Must be one of: ${validLevels.join(", ")}`,
+          );
+        }
+      });
     }
 
     return {

@@ -1,9 +1,9 @@
-﻿import { prisma } from '@/lib/prisma';
-import { generationQueue } from '@/lib/queue';
+﻿import { prisma } from "@/lib/prisma";
+import { generationQueue } from "@/lib/queue";
 
 export interface ProgressStatus {
   bookId: string;
-  status: 'pending' | 'generating' | 'ready' | 'failed';
+  status: "pending" | "generating" | "ready" | "failed";
   progress: number;
   generated: number;
   total: number;
@@ -28,60 +28,49 @@ export class ProgressService {
     });
 
     if (!book) {
-      throw new Error('Book not found');
+      throw new Error("Book not found");
     }
 
     const generated = book.bookPuzzles.length;
     const total = book.puzzleCount;
 
     const calculatedProgress =
-      total > 0
-        ? Math.round((generated / total) * 100)
-        : 0;
+      total > 0 ? Math.round((generated / total) * 100) : 0;
 
     const progress: ProgressStatus = {
       bookId: book.id,
-      status: book.status as ProgressStatus['status'],
+      status: book.status as ProgressStatus["status"],
       progress: calculatedProgress,
       generated,
       total,
       failedPuzzles: 0,
-      qualityScore: book.qualityScore
-        ? Number(book.qualityScore)
-        : undefined,
+      qualityScore: book.qualityScore ? Number(book.qualityScore) : undefined,
     };
 
     // Find the active generation job for this book.
     try {
       const jobs = await generationQueue.getJobs([
-        'waiting',
-        'active',
-        'delayed',
+        "waiting",
+        "active",
+        "delayed",
       ]);
 
-      const job = jobs.find(
-        (candidate) => candidate.data?.bookId === bookId,
-      );
+      const job = jobs.find((candidate) => candidate.data?.bookId === bookId);
 
       if (job) {
         progress.jobId = job.id;
 
         progress.progress =
-          typeof job.progress === 'number'
-            ? job.progress
-            : calculatedProgress;
+          typeof job.progress === "number" ? job.progress : calculatedProgress;
 
-        if (book.status === 'pending') {
-          progress.status = 'pending';
-        } else if (book.status === 'generating') {
-          progress.status = 'generating';
+        if (book.status === "pending") {
+          progress.status = "pending";
+        } else if (book.status === "generating") {
+          progress.status = "generating";
         }
       }
     } catch (error) {
-      console.error(
-        'Failed to get generation job progress:',
-        error,
-      );
+      console.error("Failed to get generation job progress:", error);
     }
 
     return progress;
@@ -90,19 +79,15 @@ export class ProgressService {
   /**
    * Cancel the active generation job for a book.
    */
-  static async cancelGeneration(
-    bookId: string,
-  ): Promise<boolean> {
+  static async cancelGeneration(bookId: string): Promise<boolean> {
     try {
       const jobs = await generationQueue.getJobs([
-        'waiting',
-        'active',
-        'delayed',
+        "waiting",
+        "active",
+        "delayed",
       ]);
 
-      const job = jobs.find(
-        (candidate) => candidate.data?.bookId === bookId,
-      );
+      const job = jobs.find((candidate) => candidate.data?.bookId === bookId);
 
       if (!job) {
         return false;
@@ -112,10 +97,7 @@ export class ProgressService {
 
       return true;
     } catch (error) {
-      console.error(
-        'Failed to cancel generation:',
-        error,
-      );
+      console.error("Failed to cancel generation:", error);
 
       throw error;
     }

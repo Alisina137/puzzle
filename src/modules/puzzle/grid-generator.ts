@@ -51,9 +51,7 @@ export class GridGenerator {
       finalCols = dims.cols;
     }
 
-    // Create empty grid
-    // Create empty grid.
-    // Words will be placed into this grid later by WordPlacer.
+    // ✅ Create an EMPTY grid (words will be placed here first)
     const grid = this.createEmptyGrid(finalRows, finalCols);
 
     return {
@@ -74,12 +72,18 @@ export class GridGenerator {
 
   /**
    * Fill the grid with random uppercase letters
+   * This should be called AFTER all words are placed
    */
   static fillGrid(grid: string[][]): void {
     const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
     for (let i = 0; i < grid.length; i++) {
       for (let j = 0; j < grid[i].length; j++) {
-        grid[i][j] = letters.charAt(Math.floor(Math.random() * letters.length));
+        // Only fill empty cells (don't overwrite placed words)
+        if (grid[i][j] === "" || grid[i][j] === " ") {
+          grid[i][j] = letters.charAt(
+            Math.floor(Math.random() * letters.length),
+          );
+        }
       }
     }
   }
