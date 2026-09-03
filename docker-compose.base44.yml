@@ -1,0 +1,101 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: puzzlebook_dev
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  setup:
+    build:
+      context: .
+      dockerfile: Dockerfile.base44
+    working_dir: /app
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+    env_file:
+      - ./.env.base44-defaults
+      - /run/base44/app.env
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/puzzlebook_dev
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: sh -c "npm install && npx prisma generate && npx prisma db push --accept-data-loss && npx prisma db seed"
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.base44
+    working_dir: /app
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+      - next_cache:/app/.next
+    env_file:
+      - ./.env.base44-defaults
+      - /run/base44/app.env
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/puzzlebook_dev
+      - REDIS_URL=redis://redis:6379
+      - BASE44_PUBLIC_HOST_SUFFIX=${BASE44_PUBLIC_HOST_SUFFIX}
+      - WATCHPACK_POLLING=true
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      setup:
+        condition: service_completed_successfully
+    command: sh -c "npx prisma generate && npx next dev -H 0.0.0.0 -p 3000"
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.base44
+    working_dir: /app
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+    env_file:
+      - ./.env.base44-defaults
+      - /run/base44/app.env
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/puzzlebook_dev
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      setup:
+        condition: service_completed_successfully
+    command: sh -c "npx prisma generate && npx tsx src/workers/generation.worker.ts"
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  node_modules:
+  next_cache:
