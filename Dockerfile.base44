@@ -1,0 +1,7 @@
+FROM node:22-slim
+
+# Prisma's schema engine needs the openssl CLI to detect the system's
+# libssl version and pick the matching engine binary. node:22-slim ships
+# without it, so db push fails with an empty "Schema engine error".
+RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
