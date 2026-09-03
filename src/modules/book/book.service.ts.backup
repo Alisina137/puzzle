@@ -48,130 +48,42 @@ export class BookService {
       console.log("[BookService] Found user:", user?.id, user?.email);
 
       if (!user) {
-        throw new Error(`User with ID ${userId} not found`);
+        throw new Error(User with ID  not found);
       }
 
-      // ✅ Step 1: Get the full recommended configuration from the template
-      const recommendation = await ConfigTemplateService.getRecommendation(
-        data.targetAudience,
-        data.difficultyLevel,
-      );
-
-      // ✅ Step 2: Build the full configuration
-      let generationSettings: any = {};
-
-      if (recommendation) {
-        // Start with the full recommendation from the template
-        generationSettings = {
-          ...recommendation,
-        };
-        console.log("[BookService] Loaded recommendation from template:", {
-          gridSize: generationSettings.gridSize,
-          wordsPerPuzzle: generationSettings.wordsPerPuzzle,
-          targetWordsPerPuzzle: generationSettings.targetWordsPerPuzzle,
-        });
-      } else {
-        // Fallback: use data.generationSettings if available
-        generationSettings = data.generationSettings || {};
-        console.warn(
-          "[BookService] No recommendation found, using provided settings",
-        );
-      }
-
-      // ✅ Step 3: Merge user-provided generationSettings (if any)
-      if (
-        data.generationSettings &&
-        Object.keys(data.generationSettings).length > 0
-      ) {
-        // Don't override the full config, just merge user overrides
+      // 🆕 Ensure trimSize is in generationSettings
+      let generationSettings = data.generationSettings || {};
+      
+      // If trimSize is provided directly, add it to generationSettings
+      if (data.trimSize) {
         generationSettings = {
           ...generationSettings,
-          ...data.generationSettings,
+          trimSize: data.trimSize,
         };
-        console.log("[BookService] Merged user settings");
       }
 
-      // ✅ Step 4: Always include trimSize
-      generationSettings = {
-        ...generationSettings,
-        trimSize: data.trimSize || "6x9",
-      };
+      // Validate the configuration
+      if (generationSettings) {
+        const validation = ConfigTemplateService.validateConfig(generationSettings);
+        if (!validation.valid) {
+          throw new Error(
+            Invalid configuration: ,
+          );
+        }
+      }
 
-      // ✅ Step 5: Ensure vocabularyLevels is set
-      if (
-        !generationSettings.vocabularyLevels ||
-        generationSettings.vocabularyLevels.length === 0
-      ) {
-        const template = await ConfigTemplateService.getTemplate(
+      // Get the recommended configuration if not provided
+      if (!generationSettings || Object.keys(generationSettings).length === 0) {
+        const recommendation = await ConfigTemplateService.getRecommendation(
           data.targetAudience,
           data.difficultyLevel,
         );
-        if (template) {
-          generationSettings.vocabularyLevels =
-            ConfigTemplateService.getVocabularyLevels(template);
-        } else {
-          generationSettings.vocabularyLevels = ["simple"];
+        if (recommendation) {
+          generationSettings = {
+            ...recommendation,
+            trimSize: data.trimSize || "6x9",
+          };
         }
-        console.log(
-          "[BookService] Set vocabularyLevels:",
-          generationSettings.vocabularyLevels,
-        );
-      }
-
-      // ✅ Step 6: Ensure targetWordsPerPuzzle is set (use wordsPerPuzzle as fallback)
-      if (
-        !generationSettings.targetWordsPerPuzzle &&
-        generationSettings.wordsPerPuzzle
-      ) {
-        generationSettings.targetWordsPerPuzzle =
-          generationSettings.wordsPerPuzzle;
-      }
-
-      // ✅ Step 7: Ensure minWordsPerPuzzle and maxWordsPerPuzzle are set
-      if (
-        !generationSettings.minWordsPerPuzzle &&
-        generationSettings.targetWordsPerPuzzle
-      ) {
-        generationSettings.minWordsPerPuzzle = Math.max(
-          3,
-          Math.floor(generationSettings.targetWordsPerPuzzle * 0.7),
-        );
-      }
-      if (
-        !generationSettings.maxWordsPerPuzzle &&
-        generationSettings.targetWordsPerPuzzle
-      ) {
-        generationSettings.maxWordsPerPuzzle = Math.min(
-          30,
-          Math.ceil(generationSettings.targetWordsPerPuzzle * 1.3),
-        );
-      }
-
-      console.log(
-        "[BookService] Final generationSettings:",
-        JSON.stringify(
-          {
-            gridSize: generationSettings.gridSize,
-            wordsPerPuzzle: generationSettings.wordsPerPuzzle,
-            targetWordsPerPuzzle: generationSettings.targetWordsPerPuzzle,
-            minWordsPerPuzzle: generationSettings.minWordsPerPuzzle,
-            maxWordsPerPuzzle: generationSettings.maxWordsPerPuzzle,
-            trimSize: generationSettings.trimSize,
-            vocabularyLevels: generationSettings.vocabularyLevels,
-          },
-          null,
-          2,
-        ),
-      );
-
-      // Validate the configuration
-      const validation =
-        ConfigTemplateService.validateConfig(generationSettings);
-      if (!validation.valid) {
-        console.error("[BookService] Validation errors:", validation.errors);
-        throw new Error(
-          `Invalid configuration: ${validation.errors.join(", ")}`,
-        );
       }
 
       // Create the book
@@ -199,7 +111,7 @@ export class BookService {
             userId: userId,
           },
           {
-            jobId: `generate-${book.id}`,
+            jobId: generate-,
             attempts: 3,
             backoff: {
               type: "exponential",
@@ -315,16 +227,13 @@ export class BookService {
       }
 
       // Validate configuration if provided
-      if (
-        data.generationSettings &&
-        Object.keys(data.generationSettings).length > 0
-      ) {
+      if (data.generationSettings) {
         const validation = ConfigTemplateService.validateConfig(
           data.generationSettings,
         );
         if (!validation.valid) {
           throw new Error(
-            `Invalid configuration: ${validation.errors.join(", ")}`,
+            Invalid configuration: ,
           );
         }
       }

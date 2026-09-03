@@ -25,8 +25,9 @@ export class GridGenerator {
   };
 
   // Minimum and maximum grid sizes
+  // ✅ FIXED: Increased max to 25 to support larger grids
   private static readonly MIN_SIZE = 8;
-  private static readonly MAX_SIZE = 20;
+  private static readonly MAX_SIZE = 25;
 
   /**
    * Generate a grid with the specified options
@@ -51,7 +52,7 @@ export class GridGenerator {
       finalCols = dims.cols;
     }
 
-    // ✅ Create an EMPTY grid (words will be placed here first)
+    // Create an EMPTY grid (words will be placed here first)
     const grid = this.createEmptyGrid(finalRows, finalCols);
 
     return {
@@ -127,3 +128,5 @@ export class GridGenerator {
     return grid.map((row) => [...row]);
   }
 }
+
+// copy

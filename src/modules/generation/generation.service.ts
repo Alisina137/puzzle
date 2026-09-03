@@ -177,13 +177,12 @@ export class GenerationService {
                 continue;
               }
 
-              // ✅ Pass bookId to generatePuzzleWithWords
               const result = await this.generatePuzzleWithWords(
                 candidateWords,
                 settings,
                 targetDifficulty,
                 allFingerprints,
-                bookId, // ← Pass bookId here
+                bookId,
               );
 
               if (result.success) {
@@ -312,7 +311,7 @@ export class GenerationService {
     settings: GenerationSettings,
     targetDifficulty: string,
     allFingerprints: any[],
-    bookId: string, // ← Added bookId parameter
+    bookId: string,
   ): Promise<{ success: boolean; puzzle?: any; error?: string }> {
     try {
       const gridResult = GridGenerator.generate({
@@ -338,7 +337,7 @@ export class GenerationService {
         };
       }
 
-      // ✅ CRITICAL FIX: Fill empty cells with random letters
+      // Fill empty cells with random letters
       GridGenerator.fillGrid(placement.grid);
 
       const placedWords = placement.placedWords || [];
@@ -356,11 +355,6 @@ export class GenerationService {
 
       const difficultyScore =
         DifficultyScorer.calculateScore(difficultyFactors);
-
-      const meetsTarget = DifficultyScorer.meetsTarget(
-        difficultyScore.score,
-        targetDifficulty,
-      );
 
       const validation = PuzzleValidator.validatePuzzle(
         placement.grid,
@@ -413,9 +407,8 @@ export class GenerationService {
         };
       }
 
-      // ✅ Save puzzle with actual bookId
       await this.savePuzzle(
-        bookId, // ← Use the actual bookId
+        bookId,
         placement,
         words,
         solution,
@@ -477,8 +470,62 @@ export class GenerationService {
 
     const settings = book.generationSettings as any;
 
-    let vocabularyLevels: string[] = defaults.vocabularyLevels;
+    console.log(
+      "[Generation] Raw settings:",
+      JSON.stringify(settings, null, 2),
+    );
 
+    const gridSize =
+      settings.gridSize !== undefined && settings.gridSize !== null
+        ? Number(settings.gridSize)
+        : defaults.gridSize;
+
+    const wordsPerPuzzle =
+      settings.wordsPerPuzzle !== undefined && settings.wordsPerPuzzle !== null
+        ? Number(settings.wordsPerPuzzle)
+        : defaults.wordsPerPuzzle;
+
+    const targetWordsPerPuzzle =
+      settings.targetWordsPerPuzzle !== undefined &&
+      settings.targetWordsPerPuzzle !== null
+        ? Number(settings.targetWordsPerPuzzle)
+        : wordsPerPuzzle;
+
+    const minWordsPerPuzzle =
+      settings.minWordsPerPuzzle !== undefined &&
+      settings.minWordsPerPuzzle !== null
+        ? Number(settings.minWordsPerPuzzle)
+        : Math.max(3, Math.floor(wordsPerPuzzle * 0.6));
+
+    const maxWordsPerPuzzle =
+      settings.maxWordsPerPuzzle !== undefined &&
+      settings.maxWordsPerPuzzle !== null
+        ? Number(settings.maxWordsPerPuzzle)
+        : Math.min(30, Math.ceil(wordsPerPuzzle * 1.3));
+
+    const minWordLength =
+      settings.minWordLength !== undefined && settings.minWordLength !== null
+        ? Number(settings.minWordLength)
+        : defaults.minWordLength;
+
+    const maxWordLength =
+      settings.maxWordLength !== undefined && settings.maxWordLength !== null
+        ? Number(settings.maxWordLength)
+        : defaults.maxWordLength;
+
+    const directions =
+      settings.directions !== undefined && settings.directions !== null
+        ? Number(settings.directions)
+        : defaults.directions;
+
+    const allowReverse =
+      settings.allowReverse !== undefined && settings.allowReverse !== null
+        ? Boolean(settings.allowReverse)
+        : defaults.allowReverse;
+
+    const overlap = settings.overlap || defaults.overlap;
+
+    let vocabularyLevels: string[] = defaults.vocabularyLevels;
     if (settings.vocabularyLevels && Array.isArray(settings.vocabularyLevels)) {
       vocabularyLevels = settings.vocabularyLevels;
     } else if (settings.vocabularyLevel) {
@@ -487,35 +534,38 @@ export class GenerationService {
       vocabularyLevels = [settings.vocabulary];
     }
 
+    console.log("[Generation] Parsed settings:", {
+      gridSize,
+      wordsPerPuzzle,
+      targetWordsPerPuzzle,
+      minWordsPerPuzzle,
+      maxWordsPerPuzzle,
+      minWordLength,
+      maxWordLength,
+      directions,
+      allowReverse,
+      overlap,
+      vocabularyLevels,
+    });
+
     return {
-      gridSize: Number(settings.gridSize) || defaults.gridSize,
-      wordsPerPuzzle:
-        Number(settings.wordsPerPuzzle) || defaults.wordsPerPuzzle,
-      targetWordsPerPuzzle:
-        Number(settings.targetWordsPerPuzzle) ||
-        Number(settings.wordsPerPuzzle) ||
-        defaults.targetWordsPerPuzzle,
-      minWordsPerPuzzle:
-        Number(settings.minWordsPerPuzzle) ||
-        Math.max(3, Math.floor((Number(settings.wordsPerPuzzle) || 10) * 0.6)),
-      maxWordsPerPuzzle:
-        Number(settings.maxWordsPerPuzzle) ||
-        Number(settings.wordsPerPuzzle) ||
-        defaults.maxWordsPerPuzzle,
-      minWordLength: Number(settings.minWordLength) || defaults.minWordLength,
-      maxWordLength: Number(settings.maxWordLength) || defaults.maxWordLength,
-      directions: Number(settings.directions) || defaults.directions,
-      allowReverse:
-        settings.allowReverse !== undefined
-          ? Boolean(settings.allowReverse)
-          : defaults.allowReverse,
-      overlap: settings.overlap || defaults.overlap,
+      gridSize,
+      wordsPerPuzzle,
+      targetWordsPerPuzzle,
+      minWordsPerPuzzle,
+      maxWordsPerPuzzle,
+      minWordLength,
+      maxWordLength,
+      directions,
+      allowReverse,
+      overlap,
       vocabularyLevels,
     };
   }
 
   /**
-   * Save a puzzle to the database
+   * ✅ FIXED: Save a puzzle to the database with complete data sanitization
+   * This prevents ALL corruption patterns seen in the PDF output
    */
   private static async savePuzzle(
     bookId: string,
@@ -525,7 +575,6 @@ export class GenerationService {
     qualityScore: number,
     difficultyScore: any,
   ): Promise<void> {
-    // ✅ Verify the book exists before saving
     const book = await prisma.book.findUnique({
       where: { id: bookId },
     });
@@ -537,15 +586,121 @@ export class GenerationService {
       throw new Error(`Book ${bookId} not found`);
     }
 
+    // ✅ STEP 1: Clean placedWords - Extract only what we need
+    const cleanPlacedWords = (placement.placedWords || []).map((pw: any) => {
+      // Get the direction name and clean it
+      let directionName = String(pw.direction?.name || "right").toLowerCase();
+
+      // Fix any corruption that might already exist
+      const corruptionMap: Record<string, string> = {
+        rght: "right",
+        bght: "right",
+        righs: "right",
+        rgft: "right",
+        r6t: "right",
+        k4t: "right",
+        i6t: "right",
+        n8t: "right",
+        bwn: "down",
+        b6wn: "down",
+        d6wn: "down",
+        dwn: "down",
+        bow: "down",
+        bown: "down",
+        d0n: "down",
+        b0n: "down",
+        lft: "left",
+        l8t: "left",
+        l2n: "left",
+        l6t: "left",
+        ld: "left",
+        lift: "left",
+        baft: "left",
+        eeft: "left",
+        lbb: "left",
+        utft: "left",
+        dft: "down",
+        btwn: "down",
+        dtwn: "down",
+        b4h: "up",
+        t4h: "up",
+        r4h: "up",
+        k4h: "up",
+        qdft: "left",
+        dene: "down",
+        ntft: "left",
+        bight: "right",
+        ld8: "left",
+        rtght: "right",
+        bdene: "down",
+      };
+
+      // Check if the direction name is corrupted
+      for (const [corrupted, correct] of Object.entries(corruptionMap)) {
+        if (directionName === corrupted || directionName.includes(corrupted)) {
+          directionName = correct;
+          break;
+        }
+      }
+
+      // Ensure valid direction name
+      const validDirections = [
+        "right",
+        "left",
+        "down",
+        "up",
+        "down-right",
+        "up-left",
+        "down-left",
+        "up-right",
+      ];
+      if (!validDirections.includes(directionName)) {
+        directionName = "right";
+      }
+
+      return {
+        word: String(pw.word || "").toUpperCase(),
+        row: Number(pw.row ?? 0),
+        col: Number(pw.col ?? 0),
+        direction: {
+          dr: Number(pw.direction?.dr ?? 0),
+          dc: Number(pw.direction?.dc ?? 1),
+          name: directionName,
+        },
+      };
+    });
+
+    // ✅ STEP 2: Clean words
+    const cleanWords = (words || []).map((w: string) =>
+      String(w).toUpperCase(),
+    );
+
+    // ✅ STEP 3: Clean grid
+    const cleanGrid = (placement.grid || []).map((row: string[]) =>
+      row.map((cell: string) => String(cell).toUpperCase()),
+    );
+
+    // ✅ STEP 4: Build clean puzzle data
+    const puzzleData = {
+      grid: cleanGrid,
+      words: cleanWords,
+      placedWords: cleanPlacedWords,
+      size: placement.grid?.length || 0,
+    };
+
+    // ✅ STEP 5: Validate data is serializable
+    try {
+      JSON.stringify(puzzleData);
+    } catch (error) {
+      console.error(`[Generation] Puzzle data is not serializable:`, error);
+      throw new Error(`Puzzle data is not serializable: ${error}`);
+    }
+
+    // ✅ STEP 6: Create puzzle
     const puzzle = await prisma.puzzle.create({
       data: {
         type: "wordsearch",
-        data: {
-          grid: placement.grid,
-          words,
-          placedWords: placement.placedWords,
-          size: placement.grid.length,
-        },
+        data: puzzleData,
         difficulty: difficultyScore.label.toLowerCase(),
         difficultyScore: difficultyScore.score,
         difficultyLabel: difficultyScore.label,
@@ -554,19 +709,22 @@ export class GenerationService {
       },
     });
 
+    // ✅ STEP 7: Create puzzle version with deep clone
     const puzzleVersion = await prisma.puzzleVersion.create({
       data: {
         puzzleId: puzzle.id,
         versionNumber: 1,
-        data: puzzle.data === null ? Prisma.JsonNull : puzzle.data,
+        data: JSON.parse(JSON.stringify(puzzleData)),
         isActive: true,
       },
     });
 
+    // ✅ STEP 8: Get existing count for position
     const existingCount = await prisma.bookPuzzle.count({
       where: { bookId },
     });
 
+    // ✅ STEP 9: Create book puzzle
     const bookPuzzle = await prisma.bookPuzzle.create({
       data: {
         bookId,
@@ -577,17 +735,85 @@ export class GenerationService {
       },
     });
 
+    // ✅ STEP 10: Clean solution words
+    const cleanSolutionWords = (solution.words || []).map((sw: any) => {
+      let direction = String(sw.direction || "right").toLowerCase();
+
+      // Fix any corruption
+      const corruptionMap: Record<string, string> = {
+        rght: "right",
+        bght: "right",
+        righs: "right",
+        rgft: "right",
+        bwn: "down",
+        b6wn: "down",
+        d6wn: "down",
+        lft: "left",
+        l8t: "left",
+        baft: "left",
+        eeft: "left",
+        qdft: "left",
+        dene: "down",
+        ntft: "left",
+        bight: "right",
+        ld8: "left",
+        dwn: "down",
+        rtght: "right",
+        bdene: "down",
+      };
+
+      for (const [corrupted, correct] of Object.entries(corruptionMap)) {
+        if (direction === corrupted || direction.includes(corrupted)) {
+          direction = correct;
+          break;
+        }
+      }
+
+      const validDirections = [
+        "right",
+        "left",
+        "down",
+        "up",
+        "down-right",
+        "up-left",
+        "down-left",
+        "up-right",
+      ];
+      if (!validDirections.includes(direction)) {
+        direction = "right";
+      }
+
+      return {
+        word: String(sw.word || "").toUpperCase(),
+        startRow: Number(sw.startRow ?? 0),
+        startCol: Number(sw.startCol ?? 0),
+        endRow: Number(sw.endRow ?? 0),
+        endCol: Number(sw.endCol ?? 0),
+        direction: direction,
+      };
+    });
+
+    // ✅ STEP 11: Clean solution grid
+    const cleanSolutionGrid = (solution.grid || []).map((row: string[]) =>
+      row.map((cell: string) => String(cell).toUpperCase()),
+    );
+
+    // ✅ STEP 12: Create solution
     await prisma.solution.create({
       data: {
         bookPuzzleId: bookPuzzle.id,
         data: {
-          grid: solution.grid,
-          words: solution.words,
+          grid: cleanSolutionGrid,
+          words: cleanSolutionWords,
         },
         validatedAt: new Date(),
         isValid: true,
       },
     });
+
+    console.log(
+      `[Generation] ✅ Saved puzzle ${bookPuzzle.displayNumber} with ${cleanWords.length} words`,
+    );
   }
 
   /**

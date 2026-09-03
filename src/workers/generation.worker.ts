@@ -12,15 +12,21 @@ interface GenerationJobData {
 
 console.log("🔍 Checking environment variables:");
 console.log("  REDIS_URL exists:", !!process.env.REDIS_URL);
-console.log("  UPSTASH_REDIS_REST_URL exists:", !!process.env.UPSTASH_REDIS_REST_URL);
-console.log("  UPSTASH_REDIS_REST_TOKEN exists:", !!process.env.UPSTASH_REDIS_REST_TOKEN);
+console.log(
+  "  UPSTASH_REDIS_REST_URL exists:",
+  !!process.env.UPSTASH_REDIS_REST_URL,
+);
+console.log(
+  "  UPSTASH_REDIS_REST_TOKEN exists:",
+  !!process.env.UPSTASH_REDIS_REST_TOKEN,
+);
 
 export const generationWorker = new Worker<GenerationJobData>(
   QUEUE_NAMES.GENERATION,
   async (job: Job<GenerationJobData>) => {
     const { bookId, userId } = job.data;
 
-    console.log("[Worker] Processing job " + job.id + " for book " + bookId);
+    console.log(`[Worker] Processing job ${job.id} for book ${bookId}`);
 
     await job.updateProgress(0);
 
@@ -31,18 +37,24 @@ export const generationWorker = new Worker<GenerationJobData>(
       });
 
       if (!book) {
-        console.log("[Worker] Book " + bookId + " not found, skipping job");
+        console.log(`[Worker] Book ${bookId} not found, skipping job`);
         await job.updateProgress(100);
         return { skipped: true, reason: "Book not found" };
       }
 
+      console.log(`[Worker] Book ${bookId} found with status: ${book.status}`);
+
+      // ✅ Update status to "generating" before starting
       await prisma.book.update({
         where: { id: bookId },
         data: { status: "generating" },
       });
+      console.log(`[Worker] Book ${bookId} status updated to "generating"`);
 
       await job.updateProgress(10);
 
+      // ✅ Start generation
+      console.log(`[Worker] Starting generation for book ${bookId}`);
       const result = await GenerationService.generateBook(bookId);
 
       console.log("[Worker] Generation result:", {
@@ -56,26 +68,40 @@ export const generationWorker = new Worker<GenerationJobData>(
 
       await job.updateProgress(90);
 
+      // ✅ Determine final status
       let status = "ready";
       if (result.failedPuzzles > 0 && result.generatedPuzzles === 0) {
         status = "failed";
+        console.log(`[Worker] Book ${bookId} failed - no puzzles generated`);
       } else if (result.failedPuzzles > 0) {
         status = "ready";
+        console.log(
+          `[Worker] Book ${bookId} partially failed - ${result.failedPuzzles} puzzles failed`,
+        );
+      } else {
+        status = "ready";
+        console.log(`[Worker] Book ${bookId} completed successfully`);
       }
 
-      // Get the quality score from the generation result
-      // If result.qualityScore is 0 but there are generated puzzles, recalculate
+      // ✅ Get the quality score from the generation result
       let qualityScore = result.qualityScore;
 
       console.log("[Worker] Initial qualityScore from result:", qualityScore);
 
       // If qualityScore is 0 but there are generated puzzles, recalculate
-      if (qualityScore === 0 && result.generatedPuzzles > 0 && result.totalPuzzles > 0) {
+      if (
+        qualityScore === 0 &&
+        result.generatedPuzzles > 0 &&
+        result.totalPuzzles > 0
+      ) {
         const successRate = result.generatedPuzzles / result.totalPuzzles;
         const baseScore = successRate * 100;
         const errorPenalty = result.errors.length * 2;
         const warningPenalty = result.warnings.length * 0.5;
-        qualityScore = Math.max(0, Math.min(100, baseScore - errorPenalty - warningPenalty));
+        qualityScore = Math.max(
+          0,
+          Math.min(100, baseScore - errorPenalty - warningPenalty),
+        );
         console.log("[Worker] Recalculated quality score:", {
           successRate,
           baseScore,
@@ -88,11 +114,14 @@ export const generationWorker = new Worker<GenerationJobData>(
       // If qualityScore is still 0 but there are generated puzzles, force it
       if (qualityScore === 0 && result.generatedPuzzles > 0) {
         qualityScore = 80; // Default good score
-        console.log("[Worker] Forced quality score to 80 because puzzles were generated");
+        console.log(
+          "[Worker] Forced quality score to 80 because puzzles were generated",
+        );
       }
 
       console.log("[Worker] Final quality score:", qualityScore);
 
+      // ✅ Update final status
       await prisma.book.update({
         where: { id: bookId },
         data: {
@@ -100,42 +129,52 @@ export const generationWorker = new Worker<GenerationJobData>(
           qualityScore: qualityScore,
         },
       });
+      console.log(`[Worker] Book ${bookId} final status: ${status}`);
 
       await job.updateProgress(100);
 
-      console.log("[Worker] Job " + job.id + " completed for book " + bookId);
-      console.log("  Generated: " + result.generatedPuzzles + "/" + result.totalPuzzles);
-      console.log("  Failed: " + result.failedPuzzles);
-      console.log("  Quality Score: " + qualityScore);
+      console.log(`[Worker] Job ${job.id} completed for book ${bookId}`);
+      console.log(
+        `  Generated: ${result.generatedPuzzles}/${result.totalPuzzles}`,
+      );
+      console.log(`  Failed: ${result.failedPuzzles}`);
+      console.log(`  Quality Score: ${qualityScore}`);
 
       if (result.errors.length > 0) {
         console.error("[Worker] Generation errors:");
         for (const error of result.errors) {
-          console.error("  - " + error);
+          console.error(`  - ${error}`);
         }
       }
 
       if (result.warnings.length > 0) {
         console.warn("[Worker] Generation warnings:");
         for (const warning of result.warnings) {
-          console.warn("  - " + warning);
+          console.warn(`  - ${warning}`);
         }
       }
 
       console.log("[Worker] Generation completed");
       return result;
     } catch (error: any) {
-      console.error("[Worker] Job " + job.id + " failed:", error.message);
+      console.error(`[Worker] Job ${job.id} failed:`, error.message);
+      console.error(`[Worker] Stack trace:`, error.stack);
 
-      // Check if the book exists before updating
+      // ✅ Update book status to failed
       const book = await prisma.book.findUnique({
         where: { id: bookId },
       });
       if (book) {
         await prisma.book.update({
           where: { id: bookId },
-          data: { status: "failed" },
+          data: {
+            status: "failed",
+            qualityScore: 0,
+          },
         });
+        console.log(
+          `[Worker] Book ${bookId} status set to "failed" due to error`,
+        );
       }
 
       throw error;
@@ -148,19 +187,19 @@ export const generationWorker = new Worker<GenerationJobData>(
       max: 10,
       duration: 5000,
     },
-  }
+  },
 );
 
 generationWorker.on("completed", (job, result) => {
-  console.log("[Worker] Job " + job.id + " completed successfully");
+  console.log(`[Worker] Job ${job.id} completed successfully`);
 });
 
 generationWorker.on("failed", (job, err) => {
-  console.error("[Worker] Job " + job?.id + " failed:", err.message);
+  console.error(`[Worker] Job ${job?.id} failed:`, err.message);
 });
 
 generationWorker.on("progress", (job, progress) => {
-  console.log("[Worker] Job " + job.id + " progress: " + progress + "%");
+  console.log(`[Worker] Job ${job.id} progress: ${progress}%`);
 });
 
 generationWorker.on("error", (err) => {

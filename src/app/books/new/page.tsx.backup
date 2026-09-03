@@ -28,7 +28,7 @@ const createBookSchema = z.object({
 
 type CreateBookFormData = z.infer<typeof createBookSchema>;
 
-// Theme type
+// 🆕 Theme type
 interface ThemeOption {
   value: string;
   label: string;
@@ -36,7 +36,7 @@ interface ThemeOption {
   wordCount: number;
 }
 
-// Fetch themes from the API
+// 🆕 Fetch themes from the API
 async function fetchThemes(): Promise<ThemeOption[]> {
   try {
     const response = await fetch("/api/themes");
@@ -68,30 +68,14 @@ const difficultyLevels = [
 
 const puzzleCountPresets = [10, 25, 50, 100, 200];
 
-// Trim Size Options for Amazon KDP
+// 🆕 Trim Size Options for Amazon KDP
 const trimSizes = [
-  { value: "5x8", label: '5" × 8" (Digest)', description: "Small, portable" },
-  {
-    value: "5.25x8",
-    label: '5.25" × 8" (Digest)',
-    description: "Slightly wider digest",
-  },
-  {
-    value: "5.5x8.5",
-    label: '5.5" × 8.5" (US Trade)',
-    description: "Standard paperback",
-  },
-  {
-    value: "6x9",
-    label: '6" × 9" (US Trade)',
-    description: "Popular novel size",
-  },
-  { value: "7x10", label: '7" × 10" (US Trade)', description: "Large format" },
-  {
-    value: "8.25x11",
-    label: '8.25" × 11" (US Letter)',
-    description: "Letter size",
-  },
+  { value: "5x8", label: "5"" × 8"" (Digest)", description: "Small, portable" },
+  { value: "5.25x8", label: "5.25"" × 8"" (Digest)", description: "Slightly wider digest" },
+  { value: "5.5x8.5", label: "5.5"" × 8.5"" (US Trade)", description: "Standard paperback" },
+  { value: "6x9", label: "6"" × 9"" (US Trade)", description: "Popular novel size" },
+  { value: "7x10", label: "7"" × 10"" (US Trade)", description: "Large format" },
+  { value: "8.25x11", label: "8.25"" × 11"" (US Letter)", description: "Letter size" },
 ];
 
 export default function CreateBookPage() {
@@ -101,8 +85,9 @@ export default function CreateBookPage() {
   const [error, setError] = useState<string | null>(null);
   const [themes, setThemes] = useState<ThemeOption[]>([]);
   const [isLoadingThemes, setIsLoadingThemes] = useState(true);
+  const [selectedTrimSize, setSelectedTrimSize] = useState("6x9");
 
-  // Load themes on component mount
+  // 🆕 Load themes on component mount
   useEffect(() => {
     async function loadThemes() {
       setIsLoadingThemes(true);
@@ -335,7 +320,7 @@ export default function CreateBookPage() {
               )}
             </div>
 
-            {/* Trim Size Selection for KDP */}
+            {/* 🆕 Trim Size Selection for KDP */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Book Trim Size <span className="text-red-500">*</span>
@@ -346,22 +331,17 @@ export default function CreateBookPage() {
                     key={size.value}
                     type="button"
                     onClick={() => setValue("trimSize", size.value)}
-                    className={`px-3 py-2 text-sm rounded-lg border transition-all text-left ${
-                      trimSize === size.value
-                        ? "border-blue-500 bg-blue-50 ring-2 ring-blue-500 ring-offset-1"
-                        : "border-gray-300 hover:border-gray-400 hover:bg-gray-50"
-                    }`}
+                    className={px-3 py-2 text-sm rounded-lg border transition-all text-left }
                   >
-                    <div className="font-medium text-gray-800">
-                      {size.label}
-                    </div>
-                    <div className="text-xs text-gray-400">
-                      {size.description}
-                    </div>
+                    <div className="font-medium text-gray-800">{size.label}</div>
+                    <div className="text-xs text-gray-400">{size.description}</div>
                   </button>
                 ))}
               </div>
-              <input type="hidden" {...register("trimSize")} />
+              <input
+                type="hidden"
+                {...register("trimSize")}
+              />
               {errors.trimSize && (
                 <p className="text-red-500 text-sm mt-1">
                   {errors.trimSize.message}

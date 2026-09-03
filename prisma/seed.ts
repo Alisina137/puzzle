@@ -101,7 +101,7 @@ export const configTemplates = {
       directions: 4,
       allowReverse: true,
       overlap: "low",
-      vocabularyLevels: ["simple"],
+      vocabularyLevels: ["simple", "intermediate"],
     },
     description: "Simple puzzles with common words for teenagers",
   },

@@ -578,3 +578,5 @@ export class WordPlacer {
     return result;
   }
 }
+
+// copy

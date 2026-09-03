@@ -15,6 +15,7 @@ export interface ConfigRecommendation {
   allowReverse: boolean;
   overlap: "low" | "medium" | "high";
   vocabularyLevels: string[];
+  trimSize?: string; // Add trimSize as optional
 }
 
 // Type for template with typed config
@@ -191,73 +192,114 @@ export class ConfigTemplateService {
   /**
    * Validate if a configuration is valid
    */
-  static validateConfig(config: ConfigRecommendation): {
+  static validateConfig(config: Partial<ConfigRecommendation> | any): {
     valid: boolean;
     errors: string[];
   } {
     const errors: string[] = [];
 
-    if (config.gridSize < 5 || config.gridSize > 25) {
+    // If config is empty or undefined, return default valid config
+    if (!config) {
+      return { valid: true, errors: [] };
+    }
+
+    // Only validate fields that exist
+    if (
+      config.gridSize !== undefined &&
+      (config.gridSize < 5 || config.gridSize > 25)
+    ) {
       errors.push("Grid size must be between 5 and 25");
     }
 
-    if (config.wordsPerPuzzle < 3 || config.wordsPerPuzzle > 30) {
+    if (
+      config.wordsPerPuzzle !== undefined &&
+      (config.wordsPerPuzzle < 3 || config.wordsPerPuzzle > 30)
+    ) {
       errors.push("wordsPerPuzzle must be between 3 and 30");
     }
 
-    if (config.targetWordsPerPuzzle < 3 || config.targetWordsPerPuzzle > 30) {
+    if (
+      config.targetWordsPerPuzzle !== undefined &&
+      (config.targetWordsPerPuzzle < 3 || config.targetWordsPerPuzzle > 30)
+    ) {
       errors.push("targetWordsPerPuzzle must be between 3 and 30");
     }
 
     if (
-      config.minWordsPerPuzzle < 1 ||
-      config.minWordsPerPuzzle > config.targetWordsPerPuzzle
+      config.minWordsPerPuzzle !== undefined &&
+      config.targetWordsPerPuzzle !== undefined
     ) {
-      errors.push(
-        "minWordsPerPuzzle must be between 1 and targetWordsPerPuzzle",
-      );
+      if (
+        config.minWordsPerPuzzle < 1 ||
+        config.minWordsPerPuzzle > config.targetWordsPerPuzzle
+      ) {
+        errors.push(
+          "minWordsPerPuzzle must be between 1 and targetWordsPerPuzzle",
+        );
+      }
     }
 
     if (
-      config.maxWordsPerPuzzle < config.targetWordsPerPuzzle ||
-      config.maxWordsPerPuzzle > 30
+      config.maxWordsPerPuzzle !== undefined &&
+      config.targetWordsPerPuzzle !== undefined
     ) {
-      errors.push(
-        "maxWordsPerPuzzle must be between targetWordsPerPuzzle and 30",
-      );
+      if (
+        config.maxWordsPerPuzzle < config.targetWordsPerPuzzle ||
+        config.maxWordsPerPuzzle > 30
+      ) {
+        errors.push(
+          "maxWordsPerPuzzle must be between targetWordsPerPuzzle and 30",
+        );
+      }
     }
 
-    if (config.minWordLength < 2 || config.minWordLength > 15) {
+    if (
+      config.minWordLength !== undefined &&
+      (config.minWordLength < 2 || config.minWordLength > 15)
+    ) {
       errors.push("Min word length must be between 2 and 15");
     }
 
-    if (config.maxWordLength < config.minWordLength) {
-      errors.push(
-        "Max word length must be greater than or equal to min word length",
-      );
-    }
-
-    if (config.directions < 2 || config.directions > 8) {
-      errors.push("Directions must be between 2 and 8");
+    if (
+      config.maxWordLength !== undefined &&
+      config.minWordLength !== undefined
+    ) {
+      if (config.maxWordLength < config.minWordLength) {
+        errors.push(
+          "Max word length must be greater than or equal to min word length",
+        );
+      }
     }
 
     if (
-      !config.vocabularyLevels ||
-      !Array.isArray(config.vocabularyLevels) ||
-      config.vocabularyLevels.length === 0
+      config.directions !== undefined &&
+      (config.directions < 2 || config.directions > 8)
     ) {
-      errors.push("vocabularyLevels must be a non-empty array");
+      errors.push("Directions must be between 2 and 8");
     }
 
-    const validLevels = ["simple", "intermediate", "hard"];
-    if (config.vocabularyLevels) {
-      config.vocabularyLevels.forEach((level) => {
-        if (!validLevels.includes(level)) {
-          errors.push(
-            `Invalid vocabulary level: ${level}. Must be one of: ${validLevels.join(", ")}`,
-          );
-        }
-      });
+    // Handle vocabularyLevels - make it optional
+    let vocabularyLevels = config.vocabularyLevels;
+
+    // If vocabularyLevels doesn't exist but vocabularyLevel does, convert it
+    if (!vocabularyLevels && config.vocabularyLevel) {
+      vocabularyLevels = [config.vocabularyLevel];
+    }
+
+    // Only validate if vocabularyLevels is provided
+    if (vocabularyLevels !== undefined) {
+      if (!Array.isArray(vocabularyLevels) || vocabularyLevels.length === 0) {
+        errors.push("vocabularyLevels must be a non-empty array");
+      } else {
+        const validLevels = ["simple", "intermediate", "hard"];
+        vocabularyLevels.forEach((level: string) => {
+          if (!validLevels.includes(level)) {
+            errors.push(
+              `Invalid vocabulary level: ${level}. Must be one of: ${validLevels.join(", ")}`,
+            );
+          }
+        });
+      }
     }
 
     return {

@@ -24,3 +24,5 @@ export interface PlacementOptions {
   randomizeDirection?: boolean;
   directions?: Direction[]; // Added: custom allowed directions
 }
+
+// copy
