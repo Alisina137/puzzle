@@ -2,5 +2,11 @@
   "previewPort": 3000,
   "healthPath": "/login",
   "startCommand": "docker compose -f docker-compose.base44.yml up -d",
-  "secrets": []
+  "secrets": [
+    {
+      "name": "OPENAI_API_KEY",
+      "description": "OpenAI API key for AI-based vocabulary generation (domain discovery, word generation, cleanup/classification). Get it from https://platform.openai.com/api-keys.",
+      "requiredAtBoot": false
+    }
+  ]
 }

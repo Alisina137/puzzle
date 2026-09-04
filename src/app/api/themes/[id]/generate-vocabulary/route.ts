@@ -11,7 +11,7 @@ const generateSchema = z.object({
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { theme: string } },
+  { params }: { params: { id: string } },
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -33,7 +33,7 @@ export async function POST(
       );
     }
 
-    const theme = decodeURIComponent(params.theme);
+    const theme = decodeURIComponent(params.id);
     const body = await request.json();
     const validationResult = generateSchema.safeParse(body);
     const retryDomains = validationResult.success

@@ -805,7 +805,15 @@ export class GenerationService {
     );
 
     // ✅ STEP 4: Build clean puzzle data
-    const puzzleData: Record<string, unknown> = {
+    const puzzleData: {
+      grid: string[][];
+      words: string[];
+      placedWords: any[];
+      size: number;
+      theme?: string;
+      domain?: string;
+      domains?: string[];
+    } = {
       grid: cleanGrid,
       words: cleanWords,
       placedWords: cleanPlacedWords,

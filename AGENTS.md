@@ -19,3 +19,14 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - **allowedDevOrigins**: `next.config.js` derives it from `BASE44_PUBLIC_HOST_SUFFIX` so the preview origin can load `/_next/*` assets
 - **Auth**: credentials-based (email/password), redirects unauthenticated users to `/login`
 - **Verify**: `curl -sf -H "Host: external-preview.example.com" http://localhost:3000/login` should return 200
+
+## Domain-Based Vocabulary System
+
+- **Architecture**: Theme → Domains → Domain JSON files (one per domain) → Difficulty arrays (simple/intermediate/hard) → Book difficulty filter → Word selection → Puzzle generation
+- **Domain files**: `src/modules/theme/word-lists/[theme]/[domain].json` — each file has `{ theme, subtheme, statistics, words: { simple, intermediate, hard } }` plus domain metadata
+- **Legacy word lists**: Static TS files (`animals.ts`, `football.ts`, etc.) still work for themes without domain directories. The generation service auto-detects which system to use.
+- **Difficulty mapping** (`src/modules/theme/vocabulary/difficulty-pools.ts`): Easy→simple, Medium→simple+intermediate, Hard→hard, Expert→hard. This is a HARD constraint — no fallback to other pools.
+- **Word selection modes**: `single-domain` (one domain per puzzle) and `mixed-domain` (multiple domains per puzzle). Stored in `book.generationSettings.wordSelectionMode`.
+- **AI vocabulary generation**: Requires `OPENAI_API_KEY` secret. Three-stage pipeline: Prompt 1 (domain discovery) → Prompt 2 (raw vocabulary per domain) → Prompt 3 (cleanup + classification per domain). Domain-level failure isolation.
+- **API routes**: `GET /api/themes/[id]/domains` (list domains), `POST /api/themes/[id]/generate-vocabulary` (trigger AI generation)
+- **Tests**: `npx vitest run src/modules/theme/` — 48 tests covering difficulty filtering, filename normalization, word list loader, and domain word selection

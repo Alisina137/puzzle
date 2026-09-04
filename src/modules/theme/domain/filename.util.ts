@@ -31,8 +31,8 @@ export function normalizeFilename(name: string): string {
     .replace(/\+/g, "and")
     // Remove apostrophes
     .replace(/['']/g, "")
-    // Remove path traversal characters and other unsafe chars
-    .replace(/[\\/:*?"<>|]/g, "")
+    // Replace path traversal characters and other unsafe chars with space
+    .replace(/[\\/:*?"<>|]/g, " ")
     // Replace any non-alphanumeric character (except hyphens and spaces) with space
     .replace(/[^a-z0-9\s-]/g, " ")
     // Replace spaces with hyphens

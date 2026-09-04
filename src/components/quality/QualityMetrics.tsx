@@ -122,7 +122,7 @@ export function QualityMetrics({
           </div>
           <div className="flex items-center gap-4">
             <span className="text-sm text-gray-500">
-              {validationRate}% valid · {solutionRate}% solutions
+              {validationRate}% valid Â· {solutionRate}% solutions
             </span>
             <span
               className={cn(

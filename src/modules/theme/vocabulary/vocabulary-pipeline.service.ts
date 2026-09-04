@@ -71,12 +71,13 @@ export class VocabularyPipelineService {
 
     if (retryDomains && retryDomains.length > 0) {
       // Retry mode: load existing discovery from saved metadata
-      discovery = this.loadSavedDiscovery(theme);
-      if (!discovery) {
+      const savedDiscovery = this.loadSavedDiscovery(theme);
+      if (!savedDiscovery) {
         throw new Error(
           `No saved domain discovery found for theme "${theme}". Run full generation first.`,
         );
       }
+      discovery = savedDiscovery;
       domainsToProcess = discovery.domains.filter((d) =>
         retryDomains.includes(d.name),
       );
