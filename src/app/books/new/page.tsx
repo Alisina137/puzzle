@@ -24,6 +24,7 @@ const createBookSchema = z.object({
   targetAudience: z.string().min(1, "Please select a target audience"),
   difficultyLevel: z.string().min(1, "Please select a difficulty level"),
   trimSize: z.string().min(1, "Please select a trim size"),
+  wordSelectionMode: z.enum(["single-domain", "mixed-domain"]).default("single-domain"),
 });
 
 type CreateBookFormData = z.infer<typeof createBookSchema>;
@@ -128,11 +129,45 @@ export default function CreateBookPage() {
       targetAudience: "",
       difficultyLevel: "",
       trimSize: "6x9",
+      wordSelectionMode: "single-domain",
     },
   });
 
   const puzzleCount = watch("puzzleCount");
   const trimSize = watch("trimSize");
+  const selectedTheme = watch("theme");
+  const wordSelectionMode = watch("wordSelectionMode");
+
+  // Domain info state
+  const [domainInfo, setDomainInfo] = useState<{
+    domainCount: number;
+    hasVocabulary: boolean;
+  } | null>(null);
+
+  // Load domains when theme changes
+  useEffect(() => {
+    if (!selectedTheme) {
+      setDomainInfo(null);
+      return;
+    }
+    async function loadDomains() {
+      try {
+        const response = await fetch(`/api/themes/${encodeURIComponent(selectedTheme)}/domains`);
+        if (response.ok) {
+          const data = await response.json();
+          setDomainInfo({
+            domainCount: data.data?.domainCount ?? 0,
+            hasVocabulary: data.data?.hasVocabulary ?? false,
+          });
+        } else {
+          setDomainInfo(null);
+        }
+      } catch {
+        setDomainInfo(null);
+      }
+    }
+    loadDomains();
+  }, [selectedTheme]);
 
   const onSubmit = async (data: CreateBookFormData) => {
     setIsSubmitting(true);
@@ -151,6 +186,7 @@ export default function CreateBookPage() {
           targetAudience: data.targetAudience,
           difficultyLevel: data.difficultyLevel,
           trimSize: data.trimSize,
+          wordSelectionMode: data.wordSelectionMode,
         }),
       });
 
@@ -331,6 +367,58 @@ export default function CreateBookPage() {
               {errors.difficultyLevel && (
                 <p className="text-red-500 text-sm mt-1">
                   {errors.difficultyLevel.message}
+                </p>
+              )}
+            </div>
+
+            {/* Word Selection Mode */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Word Selection Mode <span className="text-red-500">*</span>
+              </label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setValue("wordSelectionMode", "single-domain")}
+                  className={`px-4 py-3 text-left rounded-lg border transition-all ${
+                    wordSelectionMode === "single-domain"
+                      ? "border-blue-500 bg-blue-50 ring-2 ring-blue-500 ring-offset-1"
+                      : "border-gray-300 hover:border-gray-400 hover:bg-gray-50"
+                  }`}
+                >
+                  <div className="font-medium text-gray-800 text-sm">
+                    🎯 One Domain Per Puzzle
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    Each puzzle uses words from one specific domain
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setValue("wordSelectionMode", "mixed-domain")}
+                  className={`px-4 py-3 text-left rounded-lg border transition-all ${
+                    wordSelectionMode === "mixed-domain"
+                      ? "border-blue-500 bg-blue-50 ring-2 ring-blue-500 ring-offset-1"
+                      : "border-gray-300 hover:border-gray-400 hover:bg-gray-50"
+                  }`}
+                >
+                  <div className="font-medium text-gray-800 text-sm">
+                    🔀 Mix Domains Per Puzzle
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    Each puzzle can use words from multiple domains
+                  </div>
+                </button>
+              </div>
+              <input type="hidden" {...register("wordSelectionMode")} />
+              {domainInfo && domainInfo.hasVocabulary && (
+                <p className="text-gray-400 text-xs mt-1">
+                  {domainInfo.domainCount} domains available for this theme
+                </p>
+              )}
+              {domainInfo && !domainInfo.hasVocabulary && selectedTheme && (
+                <p className="text-amber-600 text-xs mt-1">
+                  No domain vocabulary generated yet for this theme. Words will be selected from the default word list.
                 </p>
               )}
             </div>

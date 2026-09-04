@@ -10,6 +10,7 @@ export interface CreateBookInput {
   targetAudience: string;
   difficultyLevel: string;
   trimSize?: string;
+  wordSelectionMode?: "single-domain" | "mixed-domain";
   generationSettings?: any;
 }
 
@@ -91,10 +92,11 @@ export class BookService {
         console.log("[BookService] Merged user settings");
       }
 
-      // ✅ Step 4: Always include trimSize
+      // ✅ Step 4: Always include trimSize and wordSelectionMode
       generationSettings = {
         ...generationSettings,
         trimSize: data.trimSize || "6x9",
+        wordSelectionMode: data.wordSelectionMode || "single-domain",
       };
 
       // ✅ Step 5: Ensure vocabularyLevels is set

@@ -12,6 +12,7 @@ const createBookSchema = z.object({
   targetAudience: z.string().min(1),
   difficultyLevel: z.string().min(1),
   trimSize: z.string().min(1).default("6x9"),
+  wordSelectionMode: z.enum(["single-domain", "mixed-domain"]).default("single-domain"),
   generationSettings: z.any().optional(),
 });
 
@@ -73,10 +74,11 @@ export async function POST(request: NextRequest) {
 
     const data = validationResult.data as CreateBookInput;
     
-    // 🆕 Add trimSize to generationSettings
+    // 🆕 Add trimSize and wordSelectionMode to generationSettings
     const generationSettings = {
       ...(data.generationSettings || {}),
       trimSize: data.trimSize || "6x9",
+      wordSelectionMode: data.wordSelectionMode || "single-domain",
     };
 
     const book = await BookService.createBook(session.user.id, {

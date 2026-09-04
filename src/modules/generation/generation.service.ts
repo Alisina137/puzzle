@@ -8,6 +8,11 @@ import { SolutionGenerator } from "@/modules/puzzle/solution-generator";
 import { Prisma } from "@prisma/client";
 import { DifficultyScorer } from "@/modules/puzzle";
 import { QualityReportService } from "@/modules/quality";
+import { DomainWordSelectionService } from "@/modules/theme/vocabulary/domain-word-selection.service";
+import { loadThemeDomains } from "@/modules/theme/vocabulary/word-list-loader";
+import { assignDomainsToPuzzles, selectDomainsForMixedPuzzle } from "@/modules/theme/vocabulary/domain-distribution.service";
+import { getEligibleDifficultyPools } from "@/modules/theme/vocabulary/difficulty-pools";
+import { WordSelectionMode } from "@/modules/theme/domain/domain.types";
 
 export interface GenerationResult {
   bookId: string;
@@ -33,6 +38,7 @@ export interface GenerationSettings {
   allowReverse: boolean;
   overlap: "low" | "medium" | "high";
   vocabularyLevels: string[];
+  wordSelectionMode: WordSelectionMode;
 }
 
 export class GenerationService {
@@ -100,38 +106,62 @@ export class GenerationService {
         );
       }
 
-      const allThemeWords = WordSelectionService.getThemeWordsByLevel(
-        book.theme,
-        settings.vocabularyLevels,
-      );
+      // Check if the theme has domain-based vocabulary
+      const themeDomainInfo = loadThemeDomains(book.theme);
+      const useDomains = themeDomainInfo.hasVocabulary && themeDomainInfo.domainCount > 0;
 
-      const normalizedThemeWords = [
-        ...new Set(
-          allThemeWords
-            .map((word) => word.trim().toUpperCase())
-            .filter(Boolean),
-        ),
-      ];
+      // Legacy word loading (used when no domains exist)
+      let eligibleWords: string[] = [];
+      if (!useDomains) {
+        const allThemeWords = WordSelectionService.getThemeWordsByLevel(
+          book.theme,
+          settings.vocabularyLevels,
+        );
 
-      console.log(
-        `[Generation] Normalized theme words: ${normalizedThemeWords.length}`,
-      );
+        const normalizedThemeWords = [
+          ...new Set(
+            allThemeWords
+              .map((word) => word.trim().toUpperCase())
+              .filter(Boolean),
+          ),
+        ];
 
-      const eligibleWords = normalizedThemeWords.filter((word) => {
-        const validLength =
-          word.length >= settings.minWordLength &&
-          word.length <= settings.maxWordLength;
-        const fitsGrid = word.length <= settings.gridSize;
-        return validLength && fitsGrid;
-      });
+        console.log(
+          `[Generation] Normalized theme words: ${normalizedThemeWords.length}`,
+        );
 
-      console.log(`[Generation] Eligible words: ${eligibleWords.length}`);
+        eligibleWords = normalizedThemeWords.filter((word) => {
+          const validLength =
+            word.length >= settings.minWordLength &&
+            word.length <= settings.maxWordLength;
+          const fitsGrid = word.length <= settings.gridSize;
+          return validLength && fitsGrid;
+        });
 
-      if (eligibleWords.length < settings.minWordsPerPuzzle) {
-        throw new Error(
-          `Not enough eligible words for theme "${book.theme}". ` +
-            `Required minimum: ${settings.minWordsPerPuzzle}, ` +
-            `available: ${eligibleWords.length}`,
+        console.log(`[Generation] Eligible words: ${eligibleWords.length}`);
+
+        if (eligibleWords.length < settings.minWordsPerPuzzle) {
+          throw new Error(
+            `Not enough eligible words for theme "${book.theme}". ` +
+              `Required minimum: ${settings.minWordsPerPuzzle}, ` +
+              `available: ${eligibleWords.length}`,
+          );
+        }
+      } else {
+        console.log(
+          `[Generation] Theme "${book.theme}" has ${themeDomainInfo.domainCount} domains. Using domain-based selection (mode: ${settings.wordSelectionMode}).`,
+        );
+        console.log(
+          `[Generation] Eligible difficulty pools for "${book.difficultyLevel}": ${getEligibleDifficultyPools(book.difficultyLevel || "Medium").join(", ")}`,
+        );
+      }
+
+      // Domain assignments for single-domain mode
+      let domainAssignments: string[] = [];
+      if (useDomains && settings.wordSelectionMode === "single-domain") {
+        domainAssignments = assignDomainsToPuzzles(
+          themeDomainInfo.domains,
+          book.puzzleCount,
         );
       }
 
@@ -155,44 +185,128 @@ export class GenerationService {
           );
 
           try {
-            const availableWords = eligibleWords.filter(
-              (word) => !usedWords.includes(word),
-            );
-
-            let wordCount = settings.targetWordsPerPuzzle;
             let puzzleWords: string[] = [];
             let placementSuccess = false;
+            let puzzleDomain = "";
+            let puzzleDomains: string[] = [];
 
-            for (let wc = wordCount; wc >= settings.minWordsPerPuzzle; wc--) {
-              const candidateWords = WordSelectionService.selectCandidateWords(
-                availableWords,
-                wc,
-                settings.gridSize,
-              );
+            if (useDomains) {
+              // Domain-based word selection
+              const domainForPuzzle =
+                settings.wordSelectionMode === "single-domain"
+                  ? domainAssignments[puzzleIndex] ||
+                    themeDomainInfo.domains[0]?.name ||
+                    ""
+                  : "";
 
-              if (candidateWords.length < wc) {
+              const domainsForPuzzle =
+                settings.wordSelectionMode === "mixed-domain"
+                  ? selectDomainsForMixedPuzzle(
+                      themeDomainInfo.domains,
+                      puzzleIndex,
+                    )
+                  : [domainForPuzzle];
+
+              const selectionResult = DomainWordSelectionService.selectWords({
+                theme: book.theme,
+                domain: domainForPuzzle,
+                domains: domainsForPuzzle,
+                mode: settings.wordSelectionMode,
+                wordsPerPuzzle: settings.targetWordsPerPuzzle,
+                bookDifficulty: targetDifficulty,
+                usedWords,
+                minWordLength: settings.minWordLength,
+                maxWordLength: settings.maxWordLength,
+                gridSize: settings.gridSize,
+                puzzleIndex,
+              });
+
+              if (selectionResult.shortage) {
                 console.warn(
-                  `[Generation] Not enough candidate words for ${wc}`,
+                  `[Generation] Word shortage for puzzle ${puzzleIndex + 1}: need ${selectionResult.shortageAmount} more words. ` +
+                    `Difficulty restriction (${targetDifficulty}) maintained — no fallback to other pools.`,
                 );
-                continue;
+                result.warnings.push(
+                  `Puzzle ${puzzleIndex + 1}: word shortage of ${selectionResult.shortageAmount} (difficulty: ${targetDifficulty})`,
+                );
               }
 
-              const result = await this.generatePuzzleWithWords(
-                candidateWords,
-                settings,
-                targetDifficulty,
-                allFingerprints,
-                bookId,
+              if (selectionResult.words.length < settings.minWordsPerPuzzle) {
+                throw new Error(
+                  `Not enough eligible words for puzzle ${puzzleIndex + 1} ` +
+                    `(domain: ${domainForPuzzle || domainsForPuzzle.join(", ")}, ` +
+                    `available: ${selectionResult.words.length}, ` +
+                    `minimum: ${settings.minWordsPerPuzzle}). ` +
+                    `Difficulty restriction (${targetDifficulty}) prevents using other pools.`,
+                );
+              }
+
+              puzzleDomain = selectionResult.domain;
+              puzzleDomains = selectionResult.domains;
+
+              // Try placing the selected words
+              for (let wc = selectionResult.words.length; wc >= settings.minWordsPerPuzzle; wc--) {
+                const candidateWords = selectionResult.words.slice(0, wc);
+
+                const genResult = await this.generatePuzzleWithWords(
+                  candidateWords,
+                  settings,
+                  targetDifficulty,
+                  allFingerprints,
+                  bookId,
+                  puzzleDomain
+                    ? { theme: book.theme, domain: puzzleDomain, domains: puzzleDomains }
+                    : undefined,
+                );
+
+                if (genResult.success) {
+                  puzzleWords = candidateWords;
+                  placementSuccess = true;
+                  console.log(`[Generation] ✅ Success with ${wc} words (domain: ${puzzleDomain || puzzleDomains.join(", ")})`);
+                  break;
+                }
+
+                console.log(`[Generation] ❌ Failed with ${wc} words`);
+              }
+            } else {
+              // Legacy word selection (backward compatibility)
+              const availableWords = eligibleWords.filter(
+                (word) => !usedWords.includes(word),
               );
 
-              if (result.success) {
-                puzzleWords = candidateWords;
-                placementSuccess = true;
-                console.log(`[Generation] ✅ Success with ${wc} words`);
-                break;
-              }
+              let wordCount = settings.targetWordsPerPuzzle;
 
-              console.log(`[Generation] ❌ Failed with ${wc} words`);
+              for (let wc = wordCount; wc >= settings.minWordsPerPuzzle; wc--) {
+                const candidateWords = WordSelectionService.selectCandidateWords(
+                  availableWords,
+                  wc,
+                  settings.gridSize,
+                );
+
+                if (candidateWords.length < wc) {
+                  console.warn(
+                    `[Generation] Not enough candidate words for ${wc}`,
+                  );
+                  continue;
+                }
+
+                const genResult = await this.generatePuzzleWithWords(
+                  candidateWords,
+                  settings,
+                  targetDifficulty,
+                  allFingerprints,
+                  bookId,
+                );
+
+                if (genResult.success) {
+                  puzzleWords = candidateWords;
+                  placementSuccess = true;
+                  console.log(`[Generation] ✅ Success with ${wc} words`);
+                  break;
+                }
+
+                console.log(`[Generation] ❌ Failed with ${wc} words`);
+              }
             }
 
             if (!placementSuccess) {
@@ -312,6 +426,7 @@ export class GenerationService {
     targetDifficulty: string,
     allFingerprints: any[],
     bookId: string,
+    puzzleMetadata?: { theme: string; domain: string; domains: string[] },
   ): Promise<{ success: boolean; puzzle?: any; error?: string }> {
     try {
       const gridResult = GridGenerator.generate({
@@ -414,6 +529,7 @@ export class GenerationService {
         solution,
         validation.score,
         difficultyScore,
+        puzzleMetadata,
       );
 
       return {
@@ -461,6 +577,7 @@ export class GenerationService {
       allowReverse: false,
       overlap: "medium" as const,
       vocabularyLevels: ["simple"],
+      wordSelectionMode: "single-domain" as WordSelectionMode,
     };
 
     if (!book.generationSettings) {
@@ -534,6 +651,11 @@ export class GenerationService {
       vocabularyLevels = [settings.vocabulary];
     }
 
+    const wordSelectionMode: WordSelectionMode =
+      settings.wordSelectionMode === "mixed-domain"
+        ? "mixed-domain"
+        : "single-domain";
+
     console.log("[Generation] Parsed settings:", {
       gridSize,
       wordsPerPuzzle,
@@ -560,6 +682,7 @@ export class GenerationService {
       allowReverse,
       overlap,
       vocabularyLevels,
+      wordSelectionMode,
     };
   }
 
@@ -574,6 +697,7 @@ export class GenerationService {
     solution: any,
     qualityScore: number,
     difficultyScore: any,
+    puzzleMetadata?: { theme: string; domain: string; domains: string[] },
   ): Promise<void> {
     const book = await prisma.book.findUnique({
       where: { id: bookId },
@@ -681,12 +805,23 @@ export class GenerationService {
     );
 
     // ✅ STEP 4: Build clean puzzle data
-    const puzzleData = {
+    const puzzleData: Record<string, unknown> = {
       grid: cleanGrid,
       words: cleanWords,
       placedWords: cleanPlacedWords,
       size: placement.grid?.length || 0,
     };
+
+    // Add domain metadata if available
+    if (puzzleMetadata) {
+      if (puzzleMetadata.domains && puzzleMetadata.domains.length > 0) {
+        puzzleData.theme = puzzleMetadata.theme;
+        puzzleData.domains = puzzleMetadata.domains;
+      } else if (puzzleMetadata.domain) {
+        puzzleData.theme = puzzleMetadata.theme;
+        puzzleData.domain = puzzleMetadata.domain;
+      }
+    }
 
     // ✅ STEP 5: Validate data is serializable
     try {
