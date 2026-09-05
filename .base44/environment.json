@@ -5,7 +5,12 @@
   "secrets": [
     {
       "name": "OPENAI_API_KEY",
-      "description": "OpenAI API key for AI-based vocabulary generation (domain discovery, word generation, cleanup/classification). Get it from https://platform.openai.com/api-keys.",
+      "description": "OpenAI API key — primary AI provider for vocabulary generation. Get it from https://platform.openai.com/api-keys.",
+      "requiredAtBoot": false
+    },
+    {
+      "name": "GEMINI_API_KEY",
+      "description": "Google Gemini API key — fallback AI provider, used automatically when OPENAI_API_KEY is missing or an OpenAI request fails. Get it from https://aistudio.google.com/apikey.",
       "requiredAtBoot": false
     }
   ]

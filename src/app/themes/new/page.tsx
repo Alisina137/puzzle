@@ -36,12 +36,18 @@ export default function CreateThemePage() {
   const [progress, setProgress] = useState<PipelineProgress | null>(null);
   const [result, setResult] = useState<PipelineProgress | null>(null);
   const [aiConfigured, setAiConfigured] = useState<boolean | null>(null);
+  const [aiProvider, setAiProvider] = useState<string>("");
+  const [geminiConfigured, setGeminiConfigured] = useState(false);
 
   // Check if AI is configured
   useEffect(() => {
     fetch("/api/themes/test-ai")
       .then((res) => res.json())
-      .then((data) => setAiConfigured(data.configured ?? false))
+      .then((data) => {
+        setAiConfigured(data.configured ?? false);
+        setAiProvider(data.provider ?? "");
+        setGeminiConfigured(data.geminiConfigured ?? false);
+      })
       .catch(() => setAiConfigured(false));
   }, []);
 
@@ -123,11 +129,27 @@ export default function CreateThemePage() {
 
         {aiConfigured === false && (
           <div className="mb-6 p-4 bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-lg">
-            <strong>AI service is not configured.</strong> Set the{" "}
+            <strong>No AI provider is configured.</strong> Set{" "}
             <code className="px-1 py-0.5 bg-amber-100 rounded">
               OPENAI_API_KEY
             </code>{" "}
+            or{" "}
+            <code className="px-1 py-0.5 bg-amber-100 rounded">
+              GEMINI_API_KEY
+            </code>{" "}
             environment variable to enable vocabulary generation.
+          </div>
+        )}
+
+        {aiConfigured && aiProvider && (
+          <div className="mb-6 p-3 bg-blue-50 border border-blue-200 text-blue-700 text-sm rounded-lg flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-green-500"></span>
+            Active AI provider: <strong>{aiProvider}</strong>
+            {aiProvider === "OpenAI" && (
+              <span className="text-blue-500">
+                (Gemini fallback {geminiConfigured ? "enabled" : "not configured"})
+              </span>
+            )}
           </div>
         )}
 

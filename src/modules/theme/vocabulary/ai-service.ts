@@ -1,78 +1,36 @@
 /**
- * Generic AI service for LLM-based vocabulary generation.
+ * AI Service — thin wrapper over the provider abstraction.
  *
- * Uses an OpenAI-compatible chat completions API.
- * The API key is read from the OPENAI_API_KEY environment variable.
+ * This was previously a direct OpenAI client. It now delegates to
+ * src/lib/ai (the provider manager) which handles:
+ *   - Provider selection (OpenAI primary, Gemini fallback)
+ *   - Automatic fallback on recoverable OpenAI failures
+ *   - JSON parsing
+ *
+ * The three vocabulary-generation services (Prompt 1, 2, 3) call
+ * AIService.chat() and AIService.chatJSON() — they are unchanged.
  */
 
-export interface AIMessage {
-  role: "system" | "user" | "assistant";
-  content: string;
-}
+import {
+  aiChat,
+  isAIConfigured,
+  getActiveProviderName,
+  AIMessage,
+  AIResponse,
+} from "@/lib/ai";
 
-export interface AIResponse {
-  content: string;
-}
+export type { AIMessage, AIResponse };
 
 export class AIService {
-  private static getApiKey(): string {
-    const key = process.env.OPENAI_API_KEY;
-    if (!key) {
-      throw new Error(
-        "OPENAI_API_KEY is not set. Cannot generate vocabulary via AI.",
-      );
-    }
-    return key;
-  }
-
-  private static getBaseUrl(): string {
-    return process.env.OPENAI_API_BASE_URL || "https://api.openai.com/v1";
-  }
-
-  private static getModel(): string {
-    return process.env.OPENAI_MODEL || "gpt-4o";
-  }
-
   /**
-   * Send a chat completion request and return the assistant's response content.
+   * Send a chat completion request through the provider abstraction.
+   * The provider manager handles selection and fallback automatically.
    */
   static async chat(messages: AIMessage[], options?: {
     temperature?: number;
     maxTokens?: number;
   }): Promise<AIResponse> {
-    const apiKey = this.getApiKey();
-    const baseUrl = this.getBaseUrl();
-    const model = this.getModel();
-
-    const response = await fetch(`${baseUrl}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages,
-        temperature: options?.temperature ?? 0.7,
-        max_tokens: options?.maxTokens ?? 4096,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(
-        `AI API request failed (${response.status}): ${errorText}`,
-      );
-    }
-
-    const data = await response.json();
-    const content = data.choices?.[0]?.message?.content;
-
-    if (!content) {
-      throw new Error("AI API returned empty response");
-    }
-
-    return { content };
+    return aiChat(messages, options);
   }
 
   /**
@@ -111,9 +69,16 @@ export class AIService {
   }
 
   /**
-   * Check if the AI service is configured (API key present).
+   * Check if any AI provider is configured (OpenAI or Gemini).
    */
   static isConfigured(): boolean {
-    return !!process.env.OPENAI_API_KEY;
+    return isAIConfigured();
+  }
+
+  /**
+   * Get the name of the active primary provider (for status/logging).
+   */
+  static getActiveProvider(): string {
+    return getActiveProviderName();
   }
 }

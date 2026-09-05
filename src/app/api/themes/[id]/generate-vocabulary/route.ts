@@ -27,7 +27,7 @@ export async function POST(
         {
           success: false,
           error:
-            "AI service is not configured. Set OPENAI_API_KEY environment variable.",
+            "No AI provider is configured. Set OPENAI_API_KEY or GEMINI_API_KEY environment variable.",
         },
         { status: 503 },
       );
