@@ -4,6 +4,7 @@ import {
   themeLabels,
   themeCategories,
 } from "@/modules/theme/word-lists";
+import { listDomainThemes, loadThemeDomains } from "@/modules/theme/vocabulary/word-list-loader";
 
 export async function GET(request: NextRequest) {
   try {
@@ -47,6 +48,34 @@ export async function GET(request: NextRequest) {
         levelCounts: levelCounts,
       };
     });
+
+    // Also discover themes from domain vocabulary directories on disk
+    const domainThemes = listDomainThemes();
+    for (const dirName of domainThemes) {
+      // Skip if already in the hardcoded list (by normalized name)
+      if (themeKeys.includes(dirName)) continue;
+
+      const domainInfo = loadThemeDomains(dirName);
+      const totalWords = domainInfo.domains.reduce(
+        (sum, d) => sum + d.wordCounts.total,
+        0,
+      );
+
+      themes.push({
+        value: dirName,
+        label: dirName
+          .split("-")
+          .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+          .join(" "),
+        category: "Custom",
+        wordCount: totalWords,
+        levelCounts: {
+          simple: domainInfo.domains.reduce((s, d) => s + d.wordCounts.simple, 0),
+          intermediate: domainInfo.domains.reduce((s, d) => s + d.wordCounts.intermediate, 0),
+          hard: domainInfo.domains.reduce((s, d) => s + d.wordCounts.hard, 0),
+        },
+      });
+    }
 
     // Filter by search if provided
     if (search) {

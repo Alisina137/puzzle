@@ -9,6 +9,7 @@ import {
   PlusCircle,
   Settings,
   LogOut,
+  Palette,
 } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
@@ -32,6 +33,7 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { href: "/books", label: "My Books", icon: BookOpen },
     { href: "/books/new", label: "Create Book", icon: PlusCircle },
+    { href: "/themes/new", label: "Create Theme", icon: Palette },
     { href: "/settings", label: "Settings", icon: Settings },
   ];
 

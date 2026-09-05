@@ -209,6 +209,30 @@ export function loadThemeDomains(themeName: string): ThemeDomainInfo {
 }
 
 /**
+ * List all themes that have domain vocabulary directories on disk.
+ * Returns theme directory names (normalized).
+ */
+export function listDomainThemes(): string[] {
+  const baseDir = getWordListsDir();
+  if (!fs.existsSync(baseDir) || !fs.statSync(baseDir).isDirectory()) {
+    return [];
+  }
+
+  return fs
+    .readdirSync(baseDir)
+    .filter((entry) => {
+      const fullPath = path.join(baseDir, entry);
+      return (
+        fs.statSync(fullPath).isDirectory() &&
+        // Must contain at least one .json file (domain vocabulary)
+        fs
+          .readdirSync(fullPath)
+          .some((f) => f.endsWith(".json") && !f.endsWith(".raw.json") && f !== "_domains.json")
+      );
+    });
+}
+
+/**
  * Legacy fallback: load words from the static TypeScript word lists.
  * Returns words in the difficulty structure format.
  */
