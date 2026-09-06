@@ -1,0 +1,498 @@
+{
+  "theme": "sports",
+  "domains": [
+    {
+      "id": 1,
+      "name": "Team Sports",
+      "description": "Vocabulary related to sports played between two opposing teams, emphasizing collaboration and strategy.",
+      "richness": "VERY_HIGH",
+      "priority": 5,
+      "generationFocus": [
+        "football/soccer",
+        "basketball",
+        "volleyball",
+        "rugby",
+        "hockey",
+        "baseball"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "Individual Sports",
+      "description": "Vocabulary for sports where athletes compete alone, focusing on personal skill, endurance, and mental fortitude.",
+      "richness": "HIGH",
+      "priority": 4,
+      "generationFocus": [
+        "track and field",
+        "swimming",
+        "gymnastics",
+        "tennis",
+        "golf",
+        "boxing"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "Water Sports",
+      "description": "Vocabulary covering sports performed in, on, or under water, including equipment and specific techniques.",
+      "richness": "VERY_HIGH",
+      "priority": 5,
+      "generationFocus": [
+        "swimming disciplines",
+        "diving",
+        "rowing",
+        "sailing",
+        "surfing",
+        "water polo"
+      ]
+    },
+    {
+      "id": 4,
+      "name": "Winter Sports",
+      "description": "Vocabulary associated with sports played on snow or ice, including equipment, venues, and specific movements.",
+      "richness": "HIGH",
+      "priority": 4,
+      "generationFocus": [
+        "skiing",
+        "snowboarding",
+        "ice skating",
+        "ice hockey",
+        "bobsleigh",
+        "curling"
+      ]
+    },
+    {
+      "id": 5,
+      "name": "Combat Sports",
+      "description": "Vocabulary related to sports involving one-on-one physical confrontation, focusing on techniques, rules, and protective gear.",
+      "richness": "MEDIUM",
+      "priority": 3,
+      "generationFocus": [
+        "boxing",
+        "wrestling",
+        "judo",
+        "taekwondo",
+        "karate",
+        "MMA"
+      ]
+    },
+    {
+      "id": 6,
+      "name": "Motorsports",
+      "description": "Vocabulary for sports involving motorized vehicles, including vehicle types, racing formats, and track elements.",
+      "richness": "MEDIUM",
+      "priority": 3,
+      "generationFocus": [
+        "Formula 1",
+        "rally racing",
+        "motocross",
+        "NASCAR",
+        "karting"
+      ]
+    },
+    {
+      "id": 7,
+      "name": "Extreme Sports",
+      "description": "Vocabulary for sports perceived as high-risk, often involving speed, height, or specialized equipment.",
+      "richness": "MEDIUM",
+      "priority": 3,
+      "generationFocus": [
+        "skydiving",
+        "bungee jumping",
+        "parkour",
+        "BMX",
+        "skateboarding",
+        "rock climbing"
+      ]
+    },
+    {
+      "id": 8,
+      "name": "Equestrian Sports",
+      "description": "Vocabulary related to sports involving horses, including riding disciplines, horse care, and equipment.",
+      "richness": "MEDIUM",
+      "priority": 3,
+      "generationFocus": [
+        "show jumping",
+        "dressage",
+        "eventing",
+        "polo",
+        "rodeo"
+      ]
+    },
+    {
+      "id": 9,
+      "name": "Athletics (Track & Field)",
+      "description": "Vocabulary specific to track and field events, including running, jumping, and throwing disciplines.",
+      "richness": "HIGH",
+      "priority": 4,
+      "generationFocus": [
+        "sprinting",
+        "long-distance running",
+        "hurdles",
+        "shot put",
+        "long jump",
+        "high jump"
+      ]
+    },
+    {
+      "id": 10,
+      "name": "Gymnastics",
+      "description": "Vocabulary covering various gymnastic disciplines, apparatus, movements, and scoring.",
+      "richness": "MEDIUM",
+      "priority": 3,
+      "generationFocus": [
+        "artistic gymnastics",
+        "rhythmic gymnastics",
+        "trampolining",
+        "acrobatics",
+        "balance beam",
+        "uneven bars"
+      ]
+    },
+    {
+      "id": 11,
+      "name": "Cycling",
+      "description": "Vocabulary related to bicycle sports, including different types of racing, bikes, and gear.",
+      "richness": "HIGH",
+      "priority": 4,
+      "generationFocus": [
+        "road cycling",
+        "mountain biking",
+        "track cycling",
+        "BMX",
+        "cyclocross",
+        "time trial"
+      ]
+    },
+    {
+      "id": 12,
+      "name": "Racket Sports",
+      "description": "Vocabulary for sports played with a racket, ball/shuttlecock, and a net or wall.",
+      "richness": "HIGH",
+      "priority": 4,
+      "generationFocus": [
+        "tennis",
+        "badminton",
+        "squash",
+        "table tennis",
+        "racketball"
+      ]
+    },
+    {
+      "id": 13,
+      "name": "Target Sports",
+      "description": "Vocabulary for sports where precision and accuracy are key, involving hitting a target.",
+      "richness": "LOW",
+      "priority": 2,
+      "generationFocus": [
+        "archery",
+        "shooting sports",
+        "darts",
+        "bowling",
+        "golf (putting)"
+      ]
+    },
+    {
+      "id": 14,
+      "name": "Martial Arts",
+      "description": "Vocabulary covering various martial arts disciplines, including stances, strikes, and training methods.",
+      "richness": "MEDIUM",
+      "priority": 3,
+      "generationFocus": [
+        "karate",
+        "judo",
+        "kung fu",
+        "aikido",
+        "Brazilian Jiu-Jitsu",
+        "Muay Thai"
+      ]
+    },
+    {
+      "id": 15,
+      "name": "Sports Equipment & Apparel",
+      "description": "General vocabulary for common sports gear, clothing, and protective equipment across various sports.",
+      "richness": "VERY_HIGH",
+      "priority": 5,
+      "generationFocus": [
+        "balls",
+        "rackets",
+        "protective gear",
+        "footwear",
+        "jerseys",
+        "training accessories"
+      ]
+    },
+    {
+      "id": 16,
+      "name": "Sports Venues & Facilities",
+      "description": "Vocabulary for different types of places where sports are played or watched, including specific areas within them.",
+      "richness": "HIGH",
+      "priority": 4,
+      "generationFocus": [
+        "stadium",
+        "arena",
+        "gymnasium",
+        "track",
+        "court",
+        "pitch"
+      ]
+    },
+    {
+      "id": 17,
+      "name": "Sports Officials & Roles",
+      "description": "Vocabulary for people involved in officiating, coaching, managing, or supporting sports.",
+      "richness": "HIGH",
+      "priority": 4,
+      "generationFocus": [
+        "referee",
+        "umpire",
+        "coach",
+        "manager",
+        "trainer",
+        "commentator"
+      ]
+    },
+    {
+      "id": 18,
+      "name": "Rules & Regulations",
+      "description": "Vocabulary related to the governing principles, infractions, and penalties in sports.",
+      "richness": "MEDIUM",
+      "priority": 4,
+      "generationFocus": [
+        "foul",
+        "penalty",
+        "offside",
+        "disqualification",
+        "rules of play",
+        "fair play"
+      ]
+    },
+    {
+      "id": 19,
+      "name": "Scoring & Results",
+      "description": "Vocabulary for how points are accumulated, game outcomes, and performance metrics.",
+      "richness": "HIGH",
+      "priority": 4,
+      "generationFocus": [
+        "goal",
+        "point",
+        "score",
+        "win",
+        "loss",
+        "draw",
+        "record"
+      ]
+    },
+    {
+      "id": 20,
+      "name": "Training & Fitness",
+      "description": "Vocabulary for physical preparation, exercises, and general well-being in sports.",
+      "richness": "VERY_HIGH",
+      "priority": 5,
+      "generationFocus": [
+        "warm-up",
+        "cool-down",
+        "strength training",
+        "cardio",
+        "stretching",
+        "nutrition",
+        "rehabilitation"
+      ]
+    },
+    {
+      "id": 21,
+      "name": "Sports Injuries & Recovery",
+      "description": "Vocabulary related to common sports-related injuries, their treatment, and rehabilitation.",
+      "richness": "MEDIUM",
+      "priority": 3,
+      "generationFocus": [
+        "sprain",
+        "strain",
+        "fracture",
+        "concussion",
+        "physiotherapy",
+        "rest"
+      ]
+    },
+    {
+      "id": 22,
+      "name": "Major Sports Events",
+      "description": "Vocabulary for significant international and national sporting competitions and festivals.",
+      "richness": "HIGH",
+      "priority": 4,
+      "generationFocus": [
+        "Olympics",
+        "World Cup",
+        "Championships",
+        "Grand Slam",
+        "Commonwealth Games",
+        "tournaments"
+      ]
+    },
+    {
+      "id": 23,
+      "name": "Gambling & Betting",
+      "description": "Vocabulary associated with placing wagers on sports outcomes, odds, and related terms.",
+      "richness": "LOW",
+      "priority": 2,
+      "generationFocus": [
+        "odds",
+        "bet",
+        "wager",
+        "bookmaker",
+        "favorite",
+        "underdog"
+      ]
+    },
+    {
+      "id": 24,
+      "name": "Fan Culture & Spectatorship",
+      "description": "Vocabulary related to sports fans, their behavior, traditions, and the experience of watching sports.",
+      "richness": "MEDIUM",
+      "priority": 3,
+      "generationFocus": [
+        "fan",
+        "supporter",
+        "cheer",
+        "chant",
+        "rivalry",
+        "attendance"
+      ]
+    },
+    {
+      "id": 25,
+      "name": "Doping & Ethics",
+      "description": "Vocabulary concerning performance-enhancing drugs, fair play, and ethical issues in sports.",
+      "richness": "LOW",
+      "priority": 2,
+      "generationFocus": [
+        "doping",
+        "PEDs",
+        "anti-doping",
+        "fair play",
+        "integrity",
+        "disqualification"
+      ]
+    },
+    {
+      "id": 26,
+      "name": "Sports Media & Journalism",
+      "description": "Vocabulary for how sports are reported, broadcast, and discussed in various media forms.",
+      "richness": "MEDIUM",
+      "priority": 3,
+      "generationFocus": [
+        "commentary",
+        "broadcast",
+        "highlights",
+        "sports reporter",
+        "interview",
+        "analysis"
+      ]
+    },
+    {
+      "id": 27,
+      "name": "Paralympic Sports",
+      "description": "Vocabulary specific to sports adapted for athletes with disabilities, including categories and equipment.",
+      "richness": "MEDIUM",
+      "priority": 3,
+      "generationFocus": [
+        "wheelchair basketball",
+        "para-athletics",
+        "boccia",
+        "goalball",
+        "classification",
+        "adaptive equipment"
+      ]
+    },
+    {
+      "id": 28,
+      "name": "Recreational Sports & Hobbies",
+      "description": "Vocabulary for sports and physical activities pursued for leisure, health, or enjoyment rather than competition.",
+      "richness": "HIGH",
+      "priority": 4,
+      "generationFocus": [
+        "jogging",
+        "hiking",
+        "yoga",
+        "pilates",
+        "dance",
+        "frisbee"
+      ]
+    },
+    {
+      "id": 29,
+      "name": "Alternative & Niche Sports",
+      "description": "Vocabulary for less common or emerging sports that may not fit traditional categories.",
+      "richness": "LOW",
+      "priority": 2,
+      "generationFocus": [
+        "ultimate frisbee",
+        "dodgeball",
+        "quidditch",
+        "sepak takraw",
+        "chess boxing",
+        "cornhole"
+      ]
+    },
+    {
+      "id": 30,
+      "name": "Management & Business of Sports",
+      "description": "Vocabulary related to the organizational, financial, and commercial aspects of the sports industry.",
+      "richness": "MEDIUM",
+      "priority": 3,
+      "generationFocus": [
+        "sponsorship",
+        "endorsement",
+        "franchise",
+        "agent",
+        "marketing",
+        "revenue"
+      ]
+    },
+    {
+      "id": 31,
+      "name": "Sports Psychology",
+      "description": "Vocabulary covering the mental aspects of sports performance, including motivation, focus, and pressure.",
+      "richness": "LOW",
+      "priority": 2,
+      "generationFocus": [
+        "motivation",
+        "concentration",
+        "visualization",
+        "pressure",
+        "mental toughness",
+        "flow state"
+      ]
+    },
+    {
+      "id": 32,
+      "name": "History & Evolution of Sports",
+      "description": "Vocabulary related to the origins, development, and significant moments in sports history.",
+      "richness": "LOW",
+      "priority": 2,
+      "generationFocus": [
+        "ancient games",
+        "modern Olympics",
+        "founding rules",
+        "legendary athletes",
+        "evolution of equipment",
+        "historical milestones"
+      ]
+    },
+    {
+      "id": 33,
+      "name": "Fan Engagement & Technology",
+      "description": "Vocabulary for how technology enhances the fan experience, data analysis, and virtual sports.",
+      "richness": "LOW",
+      "priority": 2,
+      "generationFocus": [
+        "VR sports",
+        "esports",
+        "fantasy sports",
+        "data analytics",
+        "streaming",
+        "wearable tech"
+      ]
+    }
+  ]
+}
