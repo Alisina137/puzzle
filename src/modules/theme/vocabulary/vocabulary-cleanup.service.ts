@@ -48,6 +48,7 @@ Classification guidelines:
 - INTERMEDIATE: moderately complex words, known to most adults (6-12 letters typically)
 - HARD: complex, specialized, or uncommon words (8-20 letters typically)
 
+Target: at least 150 final unique words. Be conservative when removing words — only remove clearly invalid, misspelled, or completely unrelated words. Preserve as much legitimate domain-specific vocabulary as possible to reach the target.
 Target distribution: 25% simple, 35% intermediate, 40% hard
 But NEVER invent words or intentionally misclassify to meet the ratio. Classify by genuine difficulty.
 

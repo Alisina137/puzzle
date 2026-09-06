@@ -22,7 +22,7 @@ Domain: "${domain.name}"
 Description: ${domain.description}
 Generation Focus: ${domain.generationFocus.join(", ")}
 
-Generate a comprehensive list of 80-200 candidate words for this domain. Include:
+Generate a comprehensive list of 250-400 candidate words for this domain. Include:
 - Common terms
 - Technical terms
 - Equipment names
@@ -63,7 +63,7 @@ export class VocabularyGenerationService {
           content: GENERATION_USER_TEMPLATE(theme, domain),
         },
       ],
-      { temperature: 0.8, maxTokens: 4096 },
+      { temperature: 0.8, maxTokens: 8192 },
     );
 
     if (!result.candidates || !Array.isArray(result.candidates)) {
