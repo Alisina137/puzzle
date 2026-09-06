@@ -54,7 +54,7 @@ export class DomainDiscoveryService {
         { role: "system", content: DISCOVERY_SYSTEM_PROMPT },
         { role: "user", content: DISCOVERY_USER_TEMPLATE(theme) },
       ],
-      { temperature: 0.7, maxTokens: 8192 },
+      { temperature: 0.7, maxTokens: 16384 },
     );
 
     // Validate and normalize

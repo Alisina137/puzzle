@@ -47,6 +47,8 @@ export class AIService {
 
   /**
    * Parse JSON from a string that may contain markdown code blocks.
+   * Falls back to truncated-JSON repair when the response was cut off
+   * mid-generation (e.g. due to maxTokens limits).
    */
   private static parseJSON<T>(content: string): T {
     // Try to extract JSON from markdown code block
@@ -61,11 +63,90 @@ export class AIService {
       const firstBrace = jsonStr.indexOf("{");
       const lastBrace = jsonStr.lastIndexOf("}");
       if (firstBrace !== -1 && lastBrace !== -1) {
-        const extracted = jsonStr.substring(firstBrace, lastBrace + 1);
-        return JSON.parse(extracted);
+        try {
+          const extracted = jsonStr.substring(firstBrace, lastBrace + 1);
+          return JSON.parse(extracted);
+        } catch {
+          // continue to repair below
+        }
       }
-      throw new Error(`Failed to parse AI response as JSON: ${content.substring(0, 200)}`);
+
+      // Last resort: attempt to repair truncated JSON
+      if (firstBrace !== -1) {
+        try {
+          const repaired = this.repairTruncatedJSON(
+            jsonStr.substring(firstBrace),
+          );
+          return JSON.parse(repaired);
+        } catch {
+          // repair also failed
+        }
+      }
+
+      throw new Error(
+        `Failed to parse AI response as JSON: ${content.substring(0, 200)}`,
+      );
     }
+  }
+
+  /**
+   * Attempt to repair truncated JSON by closing open structures.
+   *
+   * When an AI response is cut off mid-generation (token limit), the JSON
+   * is incomplete. This method tracks bracket/brace depth (accounting for
+   * strings) and closes any open structures so the partial data is still
+   * usable. It also handles mid-string truncation and trailing commas.
+   */
+  private static repairTruncatedJSON(text: string): string {
+    let result = text;
+
+    // Track depth of brackets and braces, accounting for strings
+    let inString = false;
+    let escape = false;
+    const stack: ("[" | "{")[] = [];
+
+    for (let i = 0; i < result.length; i++) {
+      const char = result[i];
+
+      if (escape) {
+        escape = false;
+        continue;
+      }
+
+      if (char === "\\" && inString) {
+        escape = true;
+        continue;
+      }
+
+      if (char === '"') {
+        inString = !inString;
+        continue;
+      }
+
+      if (inString) continue;
+
+      if (char === "[" || char === "{") {
+        stack.push(char);
+      } else if (char === "]" || char === "}") {
+        stack.pop();
+      }
+    }
+
+    // If truncated mid-string, close the string
+    if (inString) {
+      result += '"';
+    }
+
+    // Remove trailing comma or whitespace before closing
+    result = result.replace(/[\s,]+$/, "");
+
+    // Close open structures in reverse order
+    while (stack.length > 0) {
+      const open = stack.pop();
+      result += open === "[" ? "]" : "}";
+    }
+
+    return result;
   }
 
   /**
