@@ -31,10 +31,9 @@ type CreateBookFormData = z.infer<typeof createBookSchema>;
 
 // Theme type
 interface ThemeOption {
-  value: string;
+  id: string;
   label: string;
-  category: string;
-  wordCount: number;
+  domainCount: number;
 }
 
 // Fetch themes from the API
@@ -306,8 +305,8 @@ export default function CreateBookPage() {
                   {isLoadingThemes ? "Loading themes..." : "Select a theme..."}
                 </option>
                 {themes.map((theme) => (
-                  <option key={theme.value} value={theme.value}>
-                    {theme.label} ({theme.wordCount} words)
+                  <option key={theme.id} value={theme.id}>
+                    {theme.label} ({theme.domainCount} domains)
                   </option>
                 ))}
               </select>
