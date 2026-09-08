@@ -10,7 +10,10 @@ import { DifficultyScorer } from "@/modules/puzzle";
 import { QualityReportService } from "@/modules/quality";
 import { DomainWordSelectionService } from "@/modules/theme/vocabulary/domain-word-selection.service";
 import { loadThemeDomains } from "@/modules/theme/vocabulary/word-list-loader";
-import { assignDomainsToPuzzles, selectDomainsForMixedPuzzle } from "@/modules/theme/vocabulary/domain-distribution.service";
+import {
+  assignDomainsToPuzzles,
+  assignDomainGroupsForMixedPuzzles,
+} from "@/modules/theme/vocabulary/domain-distribution.service";
 import { getEligibleDifficultyPools } from "@/modules/theme/vocabulary/difficulty-pools";
 import { WordSelectionMode } from "@/modules/theme/domain/domain.types";
 
@@ -108,7 +111,8 @@ export class GenerationService {
 
       // Check if the theme has domain-based vocabulary
       const themeDomainInfo = loadThemeDomains(book.theme);
-      const useDomains = themeDomainInfo.hasVocabulary && themeDomainInfo.domainCount > 0;
+      const useDomains =
+        themeDomainInfo.hasVocabulary && themeDomainInfo.domainCount > 0;
 
       // Legacy word loading (used when no domains exist)
       let eligibleWords: string[] = [];
@@ -157,9 +161,22 @@ export class GenerationService {
       }
 
       // Domain assignments for single-domain mode
+      // Domain assignments for single-domain mode
       let domainAssignments: string[] = [];
       if (useDomains && settings.wordSelectionMode === "single-domain") {
         domainAssignments = assignDomainsToPuzzles(
+          themeDomainInfo.domains,
+          book.puzzleCount,
+        );
+      }
+
+      // Domain group assignments for mixed-domain mode — computed once
+      // up front (same pattern as domainAssignments above) so grouping
+      // is random-and-non-repeating across the whole book, instead of
+      // being recomputed as a sliding window per puzzle.
+      let mixedDomainAssignments: string[][] = [];
+      if (useDomains && settings.wordSelectionMode === "mixed-domain") {
+        mixedDomainAssignments = assignDomainGroupsForMixedPuzzles(
           themeDomainInfo.domains,
           book.puzzleCount,
         );
@@ -201,10 +218,7 @@ export class GenerationService {
 
               const domainsForPuzzle =
                 settings.wordSelectionMode === "mixed-domain"
-                  ? selectDomainsForMixedPuzzle(
-                      themeDomainInfo.domains,
-                      puzzleIndex,
-                    )
+                  ? mixedDomainAssignments[puzzleIndex] || []
                   : [domainForPuzzle];
 
               const selectionResult = DomainWordSelectionService.selectWords({
@@ -245,7 +259,11 @@ export class GenerationService {
               puzzleDomains = selectionResult.domains;
 
               // Try placing the selected words
-              for (let wc = selectionResult.words.length; wc >= settings.minWordsPerPuzzle; wc--) {
+              for (
+                let wc = selectionResult.words.length;
+                wc >= settings.minWordsPerPuzzle;
+                wc--
+              ) {
                 const candidateWords = selectionResult.words.slice(0, wc);
 
                 const genResult = await this.generatePuzzleWithWords(
@@ -255,14 +273,20 @@ export class GenerationService {
                   allFingerprints,
                   bookId,
                   puzzleDomain
-                    ? { theme: book.theme, domain: puzzleDomain, domains: puzzleDomains }
+                    ? {
+                        theme: book.theme,
+                        domain: puzzleDomain,
+                        domains: puzzleDomains,
+                      }
                     : undefined,
                 );
 
                 if (genResult.success) {
                   puzzleWords = candidateWords;
                   placementSuccess = true;
-                  console.log(`[Generation] ✅ Success with ${wc} words (domain: ${puzzleDomain || puzzleDomains.join(", ")})`);
+                  console.log(
+                    `[Generation] ✅ Success with ${wc} words (domain: ${puzzleDomain || puzzleDomains.join(", ")})`,
+                  );
                   break;
                 }
 
@@ -277,11 +301,12 @@ export class GenerationService {
               let wordCount = settings.targetWordsPerPuzzle;
 
               for (let wc = wordCount; wc >= settings.minWordsPerPuzzle; wc--) {
-                const candidateWords = WordSelectionService.selectCandidateWords(
-                  availableWords,
-                  wc,
-                  settings.gridSize,
-                );
+                const candidateWords =
+                  WordSelectionService.selectCandidateWords(
+                    availableWords,
+                    wc,
+                    settings.gridSize,
+                  );
 
                 if (candidateWords.length < wc) {
                   console.warn(

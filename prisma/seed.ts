@@ -11,13 +11,13 @@ export const configTemplates = {
     audience: "Children",
     difficulty: "Easy",
     config: {
-      gridSize: 8,
-      wordsPerPuzzle: 8,
-      targetWordsPerPuzzle: 8,
-      minWordsPerPuzzle: 6,
+      gridSize: 9,
+      wordsPerPuzzle: 9,
+      targetWordsPerPuzzle: 9,
+      minWordsPerPuzzle: 8,
       maxWordsPerPuzzle: 10,
       minWordLength: 3,
-      maxWordLength: 7, // gridSize - 2
+      maxWordLength: 8, // gridSize - 2
       directions: 4,
       allowReverse: true,
       overlap: "low",
@@ -33,7 +33,7 @@ export const configTemplates = {
       gridSize: 10, // 8 + 2
       wordsPerPuzzle: 10,
       targetWordsPerPuzzle: 10,
-      minWordsPerPuzzle: 8,
+      minWordsPerPuzzle: 9,
       maxWordsPerPuzzle: 12,
       minWordLength: 4,
       maxWordLength: 9, // gridSize - 2
@@ -49,17 +49,17 @@ export const configTemplates = {
     audience: "Children",
     difficulty: "Hard",
     config: {
-      gridSize: 12, // 10 + 2
+      gridSize: 11, // 10 + 2
       wordsPerPuzzle: 12,
       targetWordsPerPuzzle: 12,
       minWordsPerPuzzle: 10,
       maxWordsPerPuzzle: 14,
       minWordLength: 4,
-      maxWordLength: 11, // gridSize - 2
+      maxWordLength: 10, // gridSize - 2
       directions: 6,
       allowReverse: true,
       overlap: "medium",
-      vocabularyLevels: ["simple", "intermediate", "hard"],
+      vocabularyLevels: ["simple", "intermediate"],
     },
     description: "Larger grid with more words for advanced children",
   },
@@ -68,14 +68,14 @@ export const configTemplates = {
     audience: "Children",
     difficulty: "Expert",
     config: {
-      gridSize: 14, // 12 + 2
+      gridSize: 12,
       wordsPerPuzzle: 14,
       targetWordsPerPuzzle: 14,
-      minWordsPerPuzzle: 11,
-      maxWordsPerPuzzle: 17,
+      minWordsPerPuzzle: 12,
+      maxWordsPerPuzzle: 16,
       minWordLength: 4,
       maxWordLength: 12, // gridSize - 2
-      directions: 8,
+      directions: 6,
       allowReverse: true,
       overlap: "high",
       vocabularyLevels: ["intermediate", "hard"],
@@ -91,13 +91,13 @@ export const configTemplates = {
     audience: "Teenagers",
     difficulty: "Easy",
     config: {
-      gridSize: 10,
-      wordsPerPuzzle: 10,
-      targetWordsPerPuzzle: 10,
-      minWordsPerPuzzle: 8,
-      maxWordsPerPuzzle: 12,
+      gridSize: 12,
+      wordsPerPuzzle: 12,
+      targetWordsPerPuzzle: 12,
+      minWordsPerPuzzle: 10,
+      maxWordsPerPuzzle: 14,
       minWordLength: 4,
-      maxWordLength: 8, // gridSize - 2
+      maxWordLength: 10, // gridSize - 2
       directions: 4,
       allowReverse: true,
       overlap: "low",
@@ -110,13 +110,13 @@ export const configTemplates = {
     audience: "Teenagers",
     difficulty: "Medium",
     config: {
-      gridSize: 12, // 10 + 2
-      wordsPerPuzzle: 12,
-      targetWordsPerPuzzle: 12,
-      minWordsPerPuzzle: 9,
-      maxWordsPerPuzzle: 15,
+      gridSize: 13, // 10 + 2
+      wordsPerPuzzle: 14,
+      targetWordsPerPuzzle: 14,
+      minWordsPerPuzzle: 12,
+      maxWordsPerPuzzle: 16,
       minWordLength: 4,
-      maxWordLength: 10, // gridSize - 2
+      maxWordLength: 11, // gridSize - 2
       directions: 6,
       allowReverse: true,
       overlap: "medium",
@@ -130,13 +130,13 @@ export const configTemplates = {
     difficulty: "Hard",
     config: {
       gridSize: 14, // 12 + 2
-      wordsPerPuzzle: 14,
-      targetWordsPerPuzzle: 14,
-      minWordsPerPuzzle: 11,
-      maxWordsPerPuzzle: 17,
+      wordsPerPuzzle: 15,
+      targetWordsPerPuzzle: 15,
+      minWordsPerPuzzle: 12,
+      maxWordsPerPuzzle: 16,
       minWordLength: 4,
       maxWordLength: 12, // gridSize - 2
-      directions: 8,
+      directions: 6,
       allowReverse: true,
       overlap: "high",
       vocabularyLevels: ["intermediate", "hard"],
@@ -148,13 +148,13 @@ export const configTemplates = {
     audience: "Teenagers",
     difficulty: "Expert",
     config: {
-      gridSize: 16, // 14 + 2
+      gridSize: 15, // 14 + 2
       wordsPerPuzzle: 16,
       targetWordsPerPuzzle: 16,
-      minWordsPerPuzzle: 12,
-      maxWordsPerPuzzle: 20,
-      minWordLength: 5,
-      maxWordLength: 14, // gridSize - 2
+      minWordsPerPuzzle: 14,
+      maxWordsPerPuzzle: 18,
+      minWordLength: 4,
+      maxWordLength: 13, // gridSize - 2
       directions: 8,
       allowReverse: true,
       overlap: "high",
@@ -171,14 +171,14 @@ export const configTemplates = {
     audience: "Adults",
     difficulty: "Easy",
     config: {
-      gridSize: 12,
-      wordsPerPuzzle: 12,
-      targetWordsPerPuzzle: 12,
-      minWordsPerPuzzle: 9,
-      maxWordsPerPuzzle: 15,
-      minWordLength: 4,
-      maxWordLength: 10, // gridSize - 2
-      directions: 4,
+      gridSize: 15,
+      wordsPerPuzzle: 15,
+      targetWordsPerPuzzle: 15,
+      minWordsPerPuzzle: 13,
+      maxWordsPerPuzzle: 18,
+      minWordLength: 5,
+      maxWordLength: 14,
+      directions: 6,
       allowReverse: true,
       overlap: "low",
       vocabularyLevels: ["simple", "intermediate"],
@@ -190,13 +190,13 @@ export const configTemplates = {
     audience: "Adults",
     difficulty: "Medium",
     config: {
-      gridSize: 14, // 12 + 2
-      wordsPerPuzzle: 14,
-      targetWordsPerPuzzle: 14,
-      minWordsPerPuzzle: 11,
-      maxWordsPerPuzzle: 17,
+      gridSize: 16,
+      wordsPerPuzzle: 16,
+      targetWordsPerPuzzle: 16,
+      minWordsPerPuzzle: 14,
+      maxWordsPerPuzzle: 18,
       minWordLength: 5,
-      maxWordLength: 12, // gridSize - 2
+      maxWordLength: 14,
       directions: 6,
       allowReverse: true,
       overlap: "medium",
@@ -209,17 +209,17 @@ export const configTemplates = {
     audience: "Adults",
     difficulty: "Hard",
     config: {
-      gridSize: 16, // 14 + 2
-      wordsPerPuzzle: 16,
-      targetWordsPerPuzzle: 16,
-      minWordsPerPuzzle: 12,
+      gridSize: 17,
+      wordsPerPuzzle: 18,
+      targetWordsPerPuzzle: 18,
+      minWordsPerPuzzle: 14,
       maxWordsPerPuzzle: 20,
-      minWordLength: 4,
-      maxWordLength: 14, // gridSize - 2
+      minWordLength: 5,
+      maxWordLength: 16, // gridSize - 2
       directions: 8,
       allowReverse: true,
       overlap: "high",
-      vocabularyLevels: ["simple", "intermediate", "hard"],
+      vocabularyLevels: ["intermediate", "hard"],
     },
     description: "Challenging puzzles for experienced solvers",
   },
@@ -229,12 +229,12 @@ export const configTemplates = {
     difficulty: "Expert",
     config: {
       gridSize: 18, // 16 + 2
-      wordsPerPuzzle: 18,
-      targetWordsPerPuzzle: 18,
-      minWordsPerPuzzle: 14,
-      maxWordsPerPuzzle: 24,
+      wordsPerPuzzle: 20,
+      targetWordsPerPuzzle: 20,
+      minWordsPerPuzzle: 16,
+      maxWordsPerPuzzle: 22,
       minWordLength: 5,
-      maxWordLength: 16, // gridSize - 2
+      maxWordLength: 17, // gridSize - 2
       directions: 8,
       allowReverse: true,
       overlap: "high",
@@ -251,16 +251,16 @@ export const configTemplates = {
     audience: "Seniors",
     difficulty: "Easy",
     config: {
-      gridSize: 14,
-      wordsPerPuzzle: 14,
-      targetWordsPerPuzzle: 14,
-      minWordsPerPuzzle: 12,
+      gridSize: 16,
+      wordsPerPuzzle: 16,
+      targetWordsPerPuzzle: 16,
+      minWordsPerPuzzle: 14,
       maxWordsPerPuzzle: 18,
       minWordLength: 4,
-      maxWordLength: 12, // gridSize - 2
-      directions: 4,
+      maxWordLength: 15,
+      directions: 6,
       allowReverse: true,
-      overlap: "low",
+      overlap: "medium",
       vocabularyLevels: ["simple", "intermediate"],
     },
     description: "Large print-friendly puzzles with short words",
@@ -270,17 +270,17 @@ export const configTemplates = {
     audience: "Seniors",
     difficulty: "Medium",
     config: {
-      gridSize: 16, // 14 + 2
-      wordsPerPuzzle: 16,
-      targetWordsPerPuzzle: 16,
-      minWordsPerPuzzle: 12,
+      gridSize: 17,
+      wordsPerPuzzle: 18,
+      targetWordsPerPuzzle: 18,
+      minWordsPerPuzzle: 14,
       maxWordsPerPuzzle: 20,
       minWordLength: 5,
-      maxWordLength: 14, // gridSize - 2
+      maxWordLength: 16,
       directions: 6,
       allowReverse: true,
       overlap: "medium",
-      vocabularyLevels: ["simple", "intermediate"],
+      vocabularyLevels: ["intermediate", "hard"],
     },
     description: "Engaging puzzles with clear readability",
   },
@@ -290,16 +290,16 @@ export const configTemplates = {
     difficulty: "Hard",
     config: {
       gridSize: 18, // 16 + 2
-      wordsPerPuzzle: 18,
-      targetWordsPerPuzzle: 18,
-      minWordsPerPuzzle: 15,
+      wordsPerPuzzle: 20,
+      targetWordsPerPuzzle: 20,
+      minWordsPerPuzzle: 16,
       maxWordsPerPuzzle: 22,
-      minWordLength: 4,
+      minWordLength: 5,
       maxWordLength: 16, // gridSize - 2
       directions: 8,
       allowReverse: true,
-      overlap: "medium",
-      vocabularyLevels: ["simple", "intermediate", "hard"],
+      overlap: "high",
+      vocabularyLevels: ["intermediate", "hard"],
     },
     description: "More challenging puzzles for active seniors",
   },
@@ -308,16 +308,16 @@ export const configTemplates = {
     audience: "Seniors",
     difficulty: "Expert",
     config: {
-      gridSize: 20, // 18 + 2
+      gridSize: 20,
       wordsPerPuzzle: 20,
       targetWordsPerPuzzle: 20,
       minWordsPerPuzzle: 16,
-      maxWordsPerPuzzle: 24,
+      maxWordsPerPuzzle: 22,
       minWordLength: 5,
-      maxWordLength: 18, // gridSize - 2
+      maxWordLength: 18,
       directions: 8,
       allowReverse: true,
-      overlap: "medium",
+      overlap: "high",
       vocabularyLevels: ["intermediate", "hard"],
     },
     description: "More challenging puzzles for active seniors",
@@ -331,17 +331,17 @@ export const configTemplates = {
     audience: "PuzzleEnthusiasts",
     difficulty: "Easy",
     config: {
-      gridSize: 16,
-      wordsPerPuzzle: 16,
-      targetWordsPerPuzzle: 16,
-      minWordsPerPuzzle: 12,
-      maxWordsPerPuzzle: 20,
-      minWordLength: 5,
-      maxWordLength: 14, // gridSize - 2
+      gridSize: 18,
+      wordsPerPuzzle: 18,
+      targetWordsPerPuzzle: 18,
+      minWordsPerPuzzle: 16,
+      maxWordsPerPuzzle: 22,
+      minWordLength: 4,
+      maxWordLength: 16, // gridSize - 2
       directions: 6,
       allowReverse: true,
       overlap: "medium",
-      vocabularyLevels: ["simple", "intermediate"],
+      vocabularyLevels: ["simple", "intermediate", "hard"],
     },
     description: "Quick puzzles for enthusiasts wanting a break",
   },
@@ -350,13 +350,13 @@ export const configTemplates = {
     audience: "PuzzleEnthusiasts",
     difficulty: "Medium",
     config: {
-      gridSize: 18, // 16 + 2
-      wordsPerPuzzle: 18,
-      targetWordsPerPuzzle: 18,
-      minWordsPerPuzzle: 14,
-      maxWordsPerPuzzle: 22,
+      gridSize: 20, // 16 + 2
+      wordsPerPuzzle: 20,
+      targetWordsPerPuzzle: 20,
+      minWordsPerPuzzle: 16,
+      maxWordsPerPuzzle: 24,
       minWordLength: 5,
-      maxWordLength: 16, // gridSize - 2
+      maxWordLength: 18, // gridSize - 2
       directions: 8,
       allowReverse: true,
       overlap: "high",
@@ -369,13 +369,13 @@ export const configTemplates = {
     audience: "PuzzleEnthusiasts",
     difficulty: "Hard",
     config: {
-      gridSize: 20, // 18 + 2
-      wordsPerPuzzle: 20,
-      targetWordsPerPuzzle: 20,
-      minWordsPerPuzzle: 16,
+      gridSize: 22,
+      wordsPerPuzzle: 22,
+      targetWordsPerPuzzle: 22,
+      minWordsPerPuzzle: 18,
       maxWordsPerPuzzle: 24,
       minWordLength: 5,
-      maxWordLength: 18, // gridSize - 2
+      maxWordLength: 20,
       directions: 8,
       allowReverse: true,
       overlap: "high",
@@ -388,11 +388,11 @@ export const configTemplates = {
     audience: "PuzzleEnthusiasts",
     difficulty: "Expert",
     config: {
-      gridSize: 22, // 20 + 2
-      wordsPerPuzzle: 22,
-      targetWordsPerPuzzle: 22,
-      minWordsPerPuzzle: 18,
-      maxWordsPerPuzzle: 28,
+      gridSize: 24, // 20 + 2
+      wordsPerPuzzle: 24,
+      targetWordsPerPuzzle: 24,
+      minWordsPerPuzzle: 20,
+      maxWordsPerPuzzle: 26,
       minWordLength: 5,
       maxWordLength: 20, // gridSize - 2
       directions: 8,

@@ -1,0 +1,667 @@
+{
+  "theme": "sports",
+  "domainCount": 50,
+  "domains": [
+    
+    
+    {
+      "id": 4,
+      "name": "Combat Sports",
+      "description": "Sports involving direct physical combat, including striking, grappling, martial arts, fighting techniques, rules, and competition terminology.",
+      "richness": "VERY_HIGH",
+      "priority": 4,
+      "generationFocus": [
+        "martial arts",
+        "boxing",
+        "wrestling",
+        "grappling",
+        "striking techniques",
+        "combat rules and terminology"
+      ]
+    },
+    {
+      "id": 5,
+      "name": "Water Sports",
+      "description": "Sports performed in, on, or around water, including aquatic disciplines, watercraft, techniques, equipment, and competition terminology.",
+      "richness": "VERY_HIGH",
+      "priority": 5,
+      "generationFocus": [
+        "aquatic sports",
+        "watercraft",
+        "aquatic techniques",
+        "water competition",
+        "water sport equipment"
+      ]
+    },
+    {
+      "id": 6,
+      "name": "Winter Sports",
+      "description": "Sports associated with snow, ice, and winter environments, including disciplines, techniques, equipment, venues, and competition terminology.",
+      "richness": "VERY_HIGH",
+      "priority": 6,
+      "generationFocus": [
+        "snow sports",
+        "ice sports",
+        "winter equipment",
+        "winter techniques",
+        "winter competition terminology"
+      ]
+    },
+    {
+      "id": 7,
+      "name": "Athletics and Track Events",
+      "description": "Track and field disciplines involving running, jumping, throwing, and combined events, including event-specific terminology and techniques.",
+      "richness": "VERY_HIGH",
+      "priority": 7,
+      "generationFocus": [
+        "running events",
+        "jumping events",
+        "throwing events",
+        "combined events",
+        "track competition terminology"
+      ]
+    },
+    {
+      "id": 8,
+      "name": "Football and Soccer",
+      "description": "Vocabulary specific to association football and related football codes, including positions, techniques, tactics, rules, equipment, and competitions.",
+      "richness": "VERY_HIGH",
+      "priority": 8,
+      "generationFocus": [
+        "soccer positions",
+        "football techniques",
+        "football tactics",
+        "football rules",
+        "football competitions"
+      ]
+    },
+    {
+      "id": 9,
+      "name": "Basketball",
+      "description": "Basketball-specific terminology covering positions, plays, techniques, rules, equipment, statistics, and competition concepts.",
+      "richness": "VERY_HIGH",
+      "priority": 9,
+      "generationFocus": [
+        "basketball positions",
+        "basketball plays",
+        "basketball techniques",
+        "basketball rules",
+        "basketball statistics"
+      ]
+    },
+    {
+      "id": 10,
+      "name": "Tennis and Racket Sports",
+      "description": "Sports using rackets or similar striking implements, including tennis, badminton, squash, table tennis, techniques, equipment, and competition terminology.",
+      "richness": "VERY_HIGH",
+      "priority": 10,
+      "generationFocus": [
+        "racket sports",
+        "racket equipment",
+        "racket techniques",
+        "court terminology",
+        "racket sport competitions"
+      ]
+    },
+    {
+      "id": 11,
+      "name": "Cricket",
+      "description": "Cricket-specific vocabulary covering players, positions, batting, bowling, fielding, rules, equipment, scoring, and competitions.",
+      "richness": "VERY_HIGH",
+      "priority": 11,
+      "generationFocus": [
+        "batting",
+        "bowling",
+        "fielding",
+        "cricket equipment",
+        "cricket rules and scoring"
+      ]
+    },
+    {
+      "id": 12,
+      "name": "Baseball and Softball",
+      "description": "Baseball and softball terminology covering positions, batting, pitching, fielding, base running, rules, equipment, and statistics.",
+      "richness": "VERY_HIGH",
+      "priority": 12,
+      "generationFocus": [
+        "baseball positions",
+        "pitching",
+        "batting",
+        "fielding",
+        "baseball statistics"
+      ]
+    },
+    {
+      "id": 13,
+      "name": "Golf",
+      "description": "Golf-specific vocabulary covering clubs, shots, courses, scoring, techniques, rules, hazards, players, and tournaments.",
+      "richness": "VERY_HIGH",
+      "priority": 13,
+      "generationFocus": [
+        "golf equipment",
+        "golf shots",
+        "golf course features",
+        "golf scoring",
+        "golf competitions"
+      ]
+    },
+    {
+      "id": 14,
+      "name": "Cycling",
+      "description": "Competitive cycling vocabulary covering bicycle types, components, disciplines, riding techniques, racing formats, and cycling terminology.",
+      "richness": "VERY_HIGH",
+      "priority": 14,
+      "generationFocus": [
+        "cycling disciplines",
+        "bicycle components",
+        "cycling techniques",
+        "cycling races",
+        "cycling terminology"
+      ]
+    },
+    {
+      "id": 15,
+      "name": "Motorsports",
+      "description": "Motorized racing and competition vocabulary covering vehicles, drivers, circuits, racing techniques, equipment, rules, and events.",
+      "richness": "VERY_HIGH",
+      "priority": 15,
+      "generationFocus": [
+        "motor racing",
+        "racing vehicles",
+        "circuits",
+        "driving techniques",
+        "motorsport rules"
+      ]
+    },
+    {
+      "id": 16,
+      "name": "Gymnastics",
+      "description": "Gymnastics vocabulary covering disciplines, apparatus, movements, routines, techniques, judging, and competition terminology.",
+      "richness": "VERY_HIGH",
+      "priority": 16,
+      "generationFocus": [
+        "gymnastics disciplines",
+        "apparatus",
+        "gymnastics movements",
+        "routines",
+        "gymnastics judging"
+      ]
+    },
+    {
+      "id": 17,
+      "name": "Equestrian Sports",
+      "description": "Sports involving horses, including riding disciplines, horse terminology, equipment, techniques, competition formats, and stable-related vocabulary.",
+      "richness": "VERY_HIGH",
+      "priority": 17,
+      "generationFocus": [
+        "equestrian disciplines",
+        "horse terminology",
+        "riding equipment",
+        "riding techniques",
+        "equestrian competitions"
+      ]
+    },
+    {
+      "id": 18,
+      "name": "Athletes and Player Roles",
+      "description": "Sports vocabulary describing athletes, player positions, competitive roles, specialist roles, and participant classifications across sports.",
+      "richness": "VERY_HIGH",
+      "priority": 18,
+      "generationFocus": [
+        "athlete roles",
+        "player positions",
+        "specialist positions",
+        "participant classifications",
+        "competitive roles"
+      ]
+    },
+    {
+      "id": 19,
+      "name": "Coaching and Training",
+      "description": "Vocabulary related to sports coaching, athlete preparation, practice methods, drills, instruction, training programs, and development.",
+      "richness": "VERY_HIGH",
+      "priority": 19,
+      "generationFocus": [
+        "coaching methods",
+        "training drills",
+        "practice techniques",
+        "athlete development",
+        "training terminology"
+      ]
+    },
+    {
+      "id": 20,
+      "name": "Sports Techniques and Skills",
+      "description": "General sports-specific vocabulary for physical techniques, skills, movements, maneuvers, execution methods, and performance actions.",
+      "richness": "VERY_HIGH",
+      "priority": 20,
+      "generationFocus": [
+        "sport techniques",
+        "athletic skills",
+        "movements",
+        "maneuvers",
+        "execution terminology"
+      ]
+    },
+    {
+      "id": 21,
+      "name": "Sports Tactics and Strategy",
+      "description": "Vocabulary describing tactical and strategic concepts used to plan, organize, and execute competitive sports performance.",
+      "richness": "VERY_HIGH",
+      "priority": 21,
+      "generationFocus": [
+        "tactics",
+        "strategies",
+        "formations",
+        "game plans",
+        "competitive decision making"
+      ]
+    },
+    {
+      "id": 22,
+      "name": "Sports Rules and Regulations",
+      "description": "Terminology concerning official sports rules, regulations, violations, penalties, procedures, and governing standards.",
+      "richness": "VERY_HIGH",
+      "priority": 22,
+      "generationFocus": [
+        "sports rules",
+        "violations",
+        "penalties",
+        "regulations",
+        "official procedures"
+      ]
+    },
+    {
+      "id": 23,
+      "name": "Sports Equipment",
+      "description": "General sports equipment and sporting implements, including tools, apparatus, protective items, and specialized competition equipment.",
+      "richness": "VERY_HIGH",
+      "priority": 23,
+      "generationFocus": [
+        "sporting equipment",
+        "athletic implements",
+        "competition equipment",
+        "training equipment",
+        "equipment components"
+      ]
+    },
+    {
+      "id": 24,
+      "name": "Sports Facilities and Venues",
+      "description": "Vocabulary for sporting venues, facilities, playing surfaces, specialized areas, and physical infrastructure used for sports.",
+      "richness": "HIGH",
+      "priority": 24,
+      "generationFocus": [
+        "sports venues",
+        "playing surfaces",
+        "stadiums",
+        "training facilities",
+        "venue features"
+      ]
+    },
+    {
+      "id": 25,
+      "name": "Sports Organizations and Governing Bodies",
+      "description": "Organizations responsible for governing, regulating, organizing, and developing sports at national and international levels.",
+      "richness": "HIGH",
+      "priority": 25,
+      "generationFocus": [
+        "governing bodies",
+        "sports federations",
+        "associations",
+        "sport organizations",
+        "regulatory institutions"
+      ]
+    },
+    {
+      "id": 26,
+      "name": "Sports Competitions and Tournaments",
+      "description": "Vocabulary related to competitive events, tournaments, matches, heats, rounds, brackets, stages, and competition formats.",
+      "richness": "VERY_HIGH",
+      "priority": 26,
+      "generationFocus": [
+        "tournaments",
+        "competition formats",
+        "match structures",
+        "rounds and stages",
+        "competition events"
+      ]
+    },
+    {
+      "id": 27,
+      "name": "Olympic Sports",
+      "description": "Vocabulary associated specifically with the Olympic Games, Olympic disciplines, events, participation, qualification, and competition structures.",
+      "richness": "HIGH",
+      "priority": 27,
+      "generationFocus": [
+        "Olympic disciplines",
+        "Olympic events",
+        "qualification",
+        "Olympic competition",
+        "Olympic terminology"
+      ]
+    },
+    {
+      "id": 28,
+      "name": "Paralympic and Adaptive Sports",
+      "description": "Sports vocabulary related to Paralympic competition, adaptive sports, classification systems, accessible equipment, and athlete participation.",
+      "richness": "HIGH",
+      "priority": 28,
+      "generationFocus": [
+        "Paralympic disciplines",
+        "adaptive sports",
+        "athlete classification",
+        "adaptive equipment",
+        "inclusive competition"
+      ]
+    },
+    {
+      "id": 29,
+      "name": "Sports Officials and Officiating",
+      "description": "Vocabulary covering referees, umpires, judges, officials, officiating procedures, decisions, signals, and competition administration.",
+      "richness": "VERY_HIGH",
+      "priority": 29,
+      "generationFocus": [
+        "sports officials",
+        "referees and umpires",
+        "judging",
+        "official signals",
+        "officiating procedures"
+      ]
+    },
+    {
+      "id": 30,
+      "name": "Sports Scoring and Statistics",
+      "description": "Sports vocabulary involving scoring systems, performance statistics, records, measurements, rankings, and quantitative analysis.",
+      "richness": "VERY_HIGH",
+      "priority": 30,
+      "generationFocus": [
+        "scoring systems",
+        "sports statistics",
+        "performance metrics",
+        "rankings",
+        "statistical terminology"
+      ]
+    },
+    {
+      "id": 31,
+      "name": "Sports Records and Achievements",
+      "description": "Vocabulary related to records, milestones, achievements, winning performances, statistical accomplishments, and notable competitive results.",
+      "richness": "HIGH",
+      "priority": 31,
+      "generationFocus": [
+        "sports records",
+        "milestones",
+        "achievements",
+        "record performances",
+        "competitive accomplishments"
+      ]
+    },
+    {
+      "id": 32,
+      "name": "Sports Awards and Honors",
+      "description": "Terminology related to awards, trophies, medals, honors, recognition, titles, and distinctions given for sporting achievement.",
+      "richness": "HIGH",
+      "priority": 32,
+      "generationFocus": [
+        "sports awards",
+        "trophies",
+        "medals",
+        "honors",
+        "achievement recognition"
+      ]
+    },
+    {
+      "id": 33,
+      "name": "Famous Athletes and Sports Figures",
+      "description": "Vocabulary centered on historically and culturally significant athletes, coaches, officials, and other notable figures in sports.",
+      "richness": "VERY_HIGH",
+      "priority": 33,
+      "generationFocus": [
+        "famous athletes",
+        "legendary players",
+        "notable coaches",
+        "sports pioneers",
+        "historical sports figures"
+      ]
+    },
+    {
+      "id": 34,
+      "name": "Sports Teams and Clubs",
+      "description": "Vocabulary involving established sports teams, clubs, franchises, team identities, and recognized club terminology.",
+      "richness": "VERY_HIGH",
+      "priority": 34,
+      "generationFocus": [
+        "sports teams",
+        "sports clubs",
+        "franchises",
+        "club identities",
+        "team terminology"
+      ]
+    },
+    {
+      "id": 35,
+      "name": "Sports Leagues and Circuits",
+      "description": "Vocabulary covering professional and amateur leagues, circuits, tours, divisions, conferences, and organized seasonal competitions.",
+      "richness": "VERY_HIGH",
+      "priority": 35,
+      "generationFocus": [
+        "sports leagues",
+        "competition circuits",
+        "divisions",
+        "professional tours",
+        "league structures"
+      ]
+    },
+    {
+      "id": 36,
+      "name": "Sports History",
+      "description": "Historical sports vocabulary covering origins, development, important eras, historical practices, milestones, and evolution of sporting traditions.",
+      "richness": "VERY_HIGH",
+      "priority": 36,
+      "generationFocus": [
+        "origins of sports",
+        "historical competitions",
+        "sports development",
+        "historical terminology",
+        "important eras"
+      ]
+    },
+    {
+      "id": 37,
+      "name": "Sports Geography",
+      "description": "Geographic vocabulary associated with sports, including sporting regions, countries, locations, traditional sporting areas, and geographic competition.",
+      "richness": "HIGH",
+      "priority": 37,
+      "generationFocus": [
+        "sporting countries",
+        "sports regions",
+        "sporting locations",
+        "regional sports",
+        "geographic competition"
+      ]
+    },
+    {
+      "id": 38,
+      "name": "Sports Science",
+      "description": "Scientific terminology directly applied to athletic performance, movement, physical adaptation, and the study of sports.",
+      "richness": "VERY_HIGH",
+      "priority": 38,
+      "generationFocus": [
+        "exercise science",
+        "human movement",
+        "performance science",
+        "physical adaptation",
+        "sports research"
+      ]
+    },
+    {
+      "id": 39,
+      "name": "Sports Medicine and Injury",
+      "description": "Sports-related medical vocabulary covering athletic injuries, prevention, treatment, rehabilitation, diagnosis, and injury management.",
+      "richness": "VERY_HIGH",
+      "priority": 39,
+      "generationFocus": [
+        "sports injuries",
+        "injury prevention",
+        "sports rehabilitation",
+        "treatment terminology",
+        "athletic injury management"
+      ]
+    },
+    {
+      "id": 40,
+      "name": "Fitness and Conditioning",
+      "description": "Vocabulary related to physical conditioning, athletic fitness, strength, endurance, mobility, flexibility, and conditioning methods.",
+      "richness": "VERY_HIGH",
+      "priority": 40,
+      "generationFocus": [
+        "physical conditioning",
+        "strength training",
+        "endurance",
+        "mobility and flexibility",
+        "fitness assessment"
+      ]
+    },
+    {
+      "id": 41,
+      "name": "Sports Nutrition",
+      "description": "Sports-focused nutrition vocabulary covering athletic diets, hydration, nutrients, fueling, supplementation concepts, and nutritional strategies.",
+      "richness": "HIGH",
+      "priority": 41,
+      "generationFocus": [
+        "athletic nutrition",
+        "sports hydration",
+        "performance nutrition",
+        "nutrient terminology",
+        "competition fueling"
+      ]
+    },
+    {
+      "id": 42,
+      "name": "Sports Psychology",
+      "description": "Psychological vocabulary related to athletic performance, motivation, concentration, confidence, mental preparation, and competitive behavior.",
+      "richness": "HIGH",
+      "priority": 42,
+      "generationFocus": [
+        "mental performance",
+        "athlete motivation",
+        "concentration",
+        "competitive psychology",
+        "mental preparation"
+      ]
+    },
+    {
+      "id": 43,
+      "name": "Sports Performance Analysis",
+      "description": "Vocabulary concerning the systematic analysis of athletic and team performance using observations, metrics, video, statistics, and evaluation methods.",
+      "richness": "VERY_HIGH",
+      "priority": 43,
+      "generationFocus": [
+        "performance analysis",
+        "video analysis",
+        "performance metrics",
+        "athlete evaluation",
+        "tactical analysis"
+      ]
+    },
+    {
+      "id": 44,
+      "name": "Sports Technology",
+      "description": "Technology used in modern sports for training, measurement, officiating, performance analysis, equipment, and competition.",
+      "richness": "HIGH",
+      "priority": 44,
+      "generationFocus": [
+        "sports technology",
+        "tracking systems",
+        "performance sensors",
+        "digital analysis",
+        "technological equipment"
+      ]
+    },
+    {
+      "id": 45,
+      "name": "Sports Apparel and Protective Gear",
+      "description": "Vocabulary covering athletic clothing, footwear, protective equipment, uniforms, specialized garments, and safety gear.",
+      "richness": "VERY_HIGH",
+      "priority": 45,
+      "generationFocus": [
+        "sports clothing",
+        "athletic footwear",
+        "protective equipment",
+        "sports uniforms",
+        "specialized gear"
+      ]
+    },
+    {
+      "id": 46,
+      "name": "Outdoor and Adventure Sports",
+      "description": "Outdoor sports and adventure activities involving natural environments, exploration, physical challenges, specialized equipment, and environmental conditions.",
+      "richness": "VERY_HIGH",
+      "priority": 46,
+      "generationFocus": [
+        "outdoor sports",
+        "adventure activities",
+        "natural environments",
+        "adventure equipment",
+        "outdoor techniques"
+      ]
+    },
+    {
+      "id": 47,
+      "name": "Extreme and Action Sports",
+      "description": "High-risk and action-oriented sports involving speed, height, complex maneuvers, specialized equipment, and challenging environments.",
+      "richness": "VERY_HIGH",
+      "priority": 47,
+      "generationFocus": [
+        "extreme sports",
+        "action sports",
+        "high-risk activities",
+        "advanced maneuvers",
+        "specialized equipment"
+      ]
+    },
+    {
+      "id": 48,
+      "name": "Sports Culture and Traditions",
+      "description": "Cultural vocabulary associated with sporting traditions, rituals, celebrations, fan practices, symbols, customs, and social aspects of sports.",
+      "richness": "HIGH",
+      "priority": 48,
+      "generationFocus": [
+        "sports traditions",
+        "fan culture",
+        "sporting rituals",
+        "symbols and customs",
+        "sports celebrations"
+      ]
+    },
+    {
+      "id": 49,
+      "name": "Sports Media and Broadcasting",
+      "description": "Vocabulary related to sports journalism, broadcasting, commentary, reporting, media production, coverage, and sports communication.",
+      "richness": "HIGH",
+      "priority": 49,
+      "generationFocus": [
+        "sports journalism",
+        "sports broadcasting",
+        "commentary",
+        "media coverage",
+        "sports reporting"
+      ]
+    },
+    {
+      "id": 50,
+      "name": "Sports Business and Industry",
+      "description": "Commercial and organizational vocabulary covering sports business, sponsorship, marketing, finance, management, licensing, and the sports industry.",
+      "richness": "VERY_HIGH",
+      "priority": 50,
+      "generationFocus": [
+        "sports business",
+        "sponsorship",
+        "sports marketing",
+        "sports finance",
+        "industry management"
+      ]
+    }
+  ]
+}

@@ -10,10 +10,7 @@ import {
   loadLegacyThemeWords,
   themeHasDomains,
 } from "./word-list-loader";
-import {
-  selectDomainsForMixedPuzzle,
-  distributeWordCountAcrossDomains,
-} from "./domain-distribution.service";
+import { distributeWordCountAcrossDomains } from "./domain-distribution.service";
 
 export interface DomainWordSelectionOptions {
   theme: string;
@@ -294,10 +291,7 @@ export class DomainWordSelectionService {
    * Shuffle and select up to count words.
    * Uses length-aware distribution for better grid placement.
    */
-  private static shuffleAndSelect(
-    words: string[],
-    count: number,
-  ): string[] {
+  private static shuffleAndSelect(words: string[], count: number): string[] {
     if (words.length === 0 || count <= 0) return [];
 
     const shuffled = this.shuffleArray(words);

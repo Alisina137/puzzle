@@ -29,9 +29,7 @@ export function assignDomainsToPuzzles(
   }
 
   // Sort domains by priority (highest first), then shuffle within same priority
-  const sortedDomains = [...domains].sort(
-    (a, b) => b.priority - a.priority,
-  );
+  const sortedDomains = [...domains].sort((a, b) => b.priority - a.priority);
 
   const assignments: string[] = [];
 
@@ -47,28 +45,92 @@ export function assignDomainsToPuzzles(
 }
 
 /**
- * Select multiple domains for a mixed-domain puzzle.
+ * Precompute domain groups for ALL puzzles in mixed-domain mode, in one
+ * call before the generation loop starts (mirrors assignDomainsToPuzzles
+ * above). Replaces the old selectDomainsForMixedPuzzle, which computed a
+ * "sliding window" per puzzle index — domains [1,2,3], then [2,3,4], then
+ * [3,4,5]... — so every domain bled into 3 consecutive puzzles and
+ * vocabulary felt repetitive even though the domain list technically
+ * changed each time.
  *
- * Returns 2-4 domains for variety, prioritizing domains with sufficient
- * vocabulary.
+ * This version instead:
+ *   1. Shuffles all domains once and cuts them into non-overlapping
+ *      groups of `domainsPerPuzzle`.
+ *   2. A domain can't be picked again until every other domain has had
+ *      a turn (one full "cycle").
+ *   3. If a cycle doesn't divide evenly, the leftover domains aren't
+ *      shipped as a short group — they're merged into the FIRST group
+ *      of the next cycle instead, so one puzzle briefly gets a few extra
+ *      domains rather than any puzzle getting fewer than normal.
+ *   4. Once a cycle is exhausted, domains are reshuffled for the next
+ *      cycle.
  */
-export function selectDomainsForMixedPuzzle(
+export function assignDomainGroupsForMixedPuzzles(
   domains: DomainInfo[],
-  puzzleIndex: number,
-  maxDomains: number = 3,
-): string[] {
-  if (domains.length === 0) {
+  puzzleCount: number,
+  domainsPerPuzzle: number = 3,
+): string[][] {
+  if (domains.length === 0 || puzzleCount === 0) {
     return [];
   }
 
-  // Rotate the starting point based on puzzle index for variety
-  const offset = puzzleIndex % domains.length;
-  const rotated = [...domains.slice(offset), ...domains.slice(0, offset)];
+  const domainNames = domains.map((d) => d.name);
 
-  // Pick up to maxDomains, prioritizing high-priority domains
-  const selected = rotated.slice(0, Math.min(maxDomains, rotated.length));
+  // Not enough distinct domains to ever form a full group — every
+  // puzzle just uses the whole set.
+  if (domainNames.length <= domainsPerPuzzle) {
+    return Array.from({ length: puzzleCount }, () => [...domainNames]);
+  }
 
-  return selected.map((d) => d.name);
+  const groups: string[][] = [];
+  let pool: string[] = shuffleArray(domainNames);
+  let pendingCarryover: string[] = [];
+
+  // Safety valve: guarantees termination even in pathological cases
+  // (e.g. domainsPerPuzzle very close to domainNames.length) instead of
+  // risking an infinite loop.
+  const maxIterations = (puzzleCount + domainNames.length) * 4;
+  let iterations = 0;
+
+  while (groups.length < puzzleCount) {
+    iterations++;
+    if (iterations > maxIterations) {
+      // Should not happen in practice; fail safe rather than hang.
+      const fallback = pendingCarryover.length > 0 ? pendingCarryover : pool;
+      groups.push(fallback.length > 0 ? fallback : [domainNames[0]]);
+      pendingCarryover = [];
+      pool = shuffleArray(domainNames);
+      continue;
+    }
+
+    if (pool.length === 0) {
+      // Cycle complete — reshuffle, excluding anything already queued
+      // as carryover so it isn't picked again immediately.
+      pool = shuffleArray(
+        domainNames.filter((d) => !pendingCarryover.includes(d)),
+      );
+    }
+
+    const takeCount = Math.min(domainsPerPuzzle, pool.length);
+    let group = pool.splice(0, takeCount);
+
+    if (group.length < domainsPerPuzzle && pool.length === 0) {
+      // End of a cycle with leftovers — stash for the next cycle's
+      // first group instead of shipping this short.
+      pendingCarryover =
+        pendingCarryover.length > 0 ? [...pendingCarryover, ...group] : group;
+      continue;
+    }
+
+    if (pendingCarryover.length > 0) {
+      group = [...pendingCarryover, ...group];
+      pendingCarryover = [];
+    }
+
+    groups.push(group);
+  }
+
+  return groups;
 }
 
 /**
