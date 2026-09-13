@@ -794,9 +794,51 @@ export class PDFGenerator {
       solutionsBackCount;
     if (estimatedTotalPages % 2 !== 0) estimatedTotalPages++;
 
-    const gutter = this.getGutterPoints(estimatedTotalPages);
+    const initialGutter = this.getGutterPoints(estimatedTotalPages);
     const baseMargins = opts.margins;
 
+    let renderResult = await this.renderPdfWithGutter(
+      book,
+      opts,
+      pageSize,
+      baseMargins,
+      initialGutter,
+    );
+
+    // The gutter above was picked from an ESTIMATE computed before
+    // rendering. If reality lands on the other side of a tier boundary
+    // (e.g. estimated 149 pages but the real render comes out to 151+),
+    // the smaller gutter would already be baked into the file — exactly
+    // what triggers KDP's "insufficient gutter" warning. Checking the
+    // gutter table against the ACTUAL rendered page count and
+    // re-rendering once if they disagree guarantees correctness
+    // regardless of any drift in the estimate.
+    const correctedGutter = this.getGutterPoints(renderResult.pageCount);
+    if (correctedGutter !== initialGutter) {
+      console.warn(
+        `[PDFGenerator] Gutter mismatch: estimated ${estimatedTotalPages} pages ` +
+          `(gutter ${initialGutter}pt) but actually rendered ${renderResult.pageCount} pages ` +
+          `(requires ${correctedGutter}pt). Re-rendering with the corrected gutter.`,
+      );
+      renderResult = await this.renderPdfWithGutter(
+        book,
+        opts,
+        pageSize,
+        baseMargins,
+        correctedGutter,
+      );
+    }
+
+    return renderResult;
+  }
+
+  private static async renderPdfWithGutter(
+    book: any,
+    opts: any,
+    pageSize: [number, number],
+    baseMargins: { top: number; bottom: number; left: number; right: number },
+    gutter: number,
+  ): Promise<PDFResult> {
     const doc = new PDFDocument({
       size: pageSize,
       autoFirstPage: false,
@@ -869,11 +911,7 @@ export class PDFGenerator {
       size: pageSize,
       margins: this.getPageMargins(pageCount, baseMargins, gutter),
     });
-    const tocEntries = this.buildTocEntries(
-      book,
-      opts,
-      FRONT_MATTER_PAGE_COUNT,
-    );
+    const tocEntries = this.buildTocEntries(book, opts, 5);
     this.addTableOfContentsPage(doc, tocEntries);
     this.addPageNumber(doc, "5", doc.page.width, doc.page.height);
 
@@ -2834,7 +2872,11 @@ export class PDFGenerator {
     const contentTop = 88;
     const contentBottom = pageHeight - 45;
     const gutterX = 20;
-    const gutterY = 20;
+    // Was a single gutterY = 20 shared by both layouts. Split so the 2x2
+    // mini-solution layout can have a tighter vertical gap between its
+    // two rows without affecting the large (2-per-page) layout's spacing.
+    const gutterYSmall = 10;
+    const gutterYLarge = 20;
 
     let slot = 0;
     let currentLayout: "small" | "large" | null = null;
@@ -2892,11 +2934,11 @@ export class PDFGenerator {
 
       if (layout === "small") {
         const smallCellWidth = (contentWidth - gutterX) / 2;
-        const smallCellHeight = (contentHeight - gutterY) / 2;
+        const smallCellHeight = (contentHeight - gutterYSmall) / 2;
         const col = slot % 2;
         const row = Math.floor(slot / 2);
         const boxX = margin + col * (smallCellWidth + gutterX);
-        const boxY = contentTop + row * (smallCellHeight + gutterY);
+        const boxY = contentTop + row * (smallCellHeight + gutterYSmall);
         this.drawSolutionMiniGrid(
           doc,
           bookPuzzle,
@@ -2907,9 +2949,9 @@ export class PDFGenerator {
         );
       } else {
         const largeCellWidth = contentWidth;
-        const largeCellHeight = (contentHeight - gutterY) / 2;
+        const largeCellHeight = (contentHeight - gutterYLarge) / 2;
         const boxX = margin;
-        const boxY = contentTop + slot * (largeCellHeight + gutterY);
+        const boxY = contentTop + slot * (largeCellHeight + gutterYLarge);
         this.drawSolutionLargeGrid(
           doc,
           bookPuzzle,
