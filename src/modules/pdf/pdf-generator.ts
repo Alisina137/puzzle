@@ -1,5 +1,6 @@
 import PDFDocument from "pdfkit";
 import { prisma } from "@/lib/prisma";
+import path from "path";
 
 export interface PDFOptions {
   pageSize?: "A4" | "Letter";
@@ -80,20 +81,41 @@ export class PDFGenerator {
     const pageHeight = doc.page.height;
     const centerY = pageHeight / 2;
 
+    // Keep the title inside comfortable side margins and let it wrap /
+    // shrink rather than overflow. See fitTitleFontSize for why this is
+    // needed: a fixed font size only "happens" to work for short titles.
+    const sidePadding = 60;
+    const maxTitleWidth = Math.max(100, pageWidth - sidePadding * 2);
+
+    const title = this.safeText(book.title);
+    const titleFit = this.fitTitleFontSize(
+      doc,
+      title,
+      maxTitleWidth,
+      pageHeight * 0.3,
+      28,
+      14,
+      "Helvetica-Bold",
+    );
+
+    const titleY = centerY - 60 - titleFit.height / 2;
+
     doc
-      .fontSize(28)
+      .fontSize(titleFit.fontSize)
       .font("Helvetica-Bold")
       .fillColor("#1a1a2e")
-      .text(this.safeText(book.title), 0, centerY - 60, {
+      .text(title, sidePadding, titleY, {
         align: "center",
-        width: pageWidth,
+        width: maxTitleWidth,
       });
+
+    const subtitleY = titleY + titleFit.height + 15;
 
     doc
       .fontSize(14)
       .font("Helvetica")
       .fillColor("#555")
-      .text("Word Search Puzzle Book", 0, centerY - 15, {
+      .text("Word Search Puzzle Book", 0, subtitleY, {
         align: "center",
         width: pageWidth,
       });
@@ -103,7 +125,7 @@ export class PDFGenerator {
         .fontSize(11)
         .font("Helvetica")
         .fillColor("#777")
-        .text(this.safeText(book.subtitle), 0, centerY + 15, {
+        .text(this.safeText(book.subtitle), 0, subtitleY + 30, {
           align: "center",
           width: pageWidth,
         });
@@ -236,7 +258,7 @@ export class PDFGenerator {
       ["Theme", this.safeText(book.theme)],
       ["Target Audience", this.safeText(book.targetAudience || "General")],
       ["Difficulty Level", this.safeText(book.difficultyLevel || "Medium")],
-      ["Total Puzzles", String(book.puzzleCount)],
+      ["Total Puzzles", String(book.bookPuzzles.length)],
       [
         "Directions Used",
         stats.directionsUsed.length > 0
@@ -248,7 +270,20 @@ export class PDFGenerator {
 
     const labelWidth = contentWidth * 0.4;
     const valueWidth = contentWidth - labelWidth - 12;
-    const rowHeight = 34;
+    const baseRowHeight = 34;
+
+    // Row heights are no longer a fixed 34pt. Long values — most often
+    // the book Title or Theme, which can be arbitrarily long strings of
+    // comma-joined subthemes — can wrap to 2+ lines at 11pt inside
+    // valueWidth. A fixed row height caused wrapped text to run straight
+    // through the divider line and into the next row. Each row now
+    // reserves however much height its own value actually needs.
+    doc.fontSize(11).font("Helvetica");
+    const rowHeights = rows.map(([, value]) => {
+      const textHeight = doc.heightOfString(value, { width: valueWidth });
+      return Math.max(baseRowHeight, textHeight + 20);
+    });
+    const blockHeight = rowHeights.reduce((sum, h) => sum + h, 0);
 
     // Vertically center the info block in the space below the header
     // instead of anchoring it at a fixed y=130. On trims like 8.25x11 the
@@ -258,10 +293,11 @@ export class PDFGenerator {
     const footerZone = 40;
     const availableHeight =
       doc.page.height - doc.page.margins.bottom - footerZone - headerBottom;
-    const blockHeight = rows.length * rowHeight;
     let y = headerBottom + Math.max(0, (availableHeight - blockHeight) / 2);
 
-    for (const [label, value] of rows) {
+    rows.forEach(([label, value], index) => {
+      const rowHeight = rowHeights[index];
+
       doc
         .fontSize(10)
         .font("Helvetica-Bold")
@@ -285,7 +321,7 @@ export class PDFGenerator {
         .stroke();
 
       y += rowHeight;
-    }
+    });
 
     // ✅ Page number is added in the main loop, not here
   }
@@ -434,6 +470,7 @@ export class PDFGenerator {
     "6x9": [432, 648],
     "7x10": [504, 720],
     "8.25x11": [594, 792],
+    "8.5x11": [612, 792],
     A4: [595.28, 841.89],
     LETTER: [612, 792],
     Letter: [612, 792],
@@ -447,7 +484,7 @@ export class PDFGenerator {
     // 2-per-page large layout. See LARGE_GRID_THRESHOLD in
     // addSolutionsPages and estimateSolutionsPageCount below.
     if (maxGridSize <= 15) return "6x9";
-    return "8.25x11";
+    return "8.5x11";
   }
 
   private static getPageSize(trimSize: string): [number, number] {
@@ -517,6 +554,60 @@ export class PDFGenerator {
     }
 
     return { fontSize: Math.round(fontSize * 10) / 10, text: renderText };
+  }
+
+  /**
+   * Finds the largest font size (within [minFontSize, startFontSize], in
+   * 1pt steps) at which `text`, WRAPPED to `maxWidth`, fits inside
+   * `maxHeight` — measured with the real PDFKit line-wrapping via
+   * doc.heightOfString, not estimated.
+   *
+   * This is the headline counterpart to fitTextToWidth: fitTextToWidth is
+   * for single-line list rows where truncating with an ellipsis is an
+   * acceptable last resort. A book title should never be silently
+   * truncated, so this instead lets it wrap across multiple lines and
+   * only shrinks the font size — the caller is responsible for reserving
+   * enough vertical room (or reflowing what comes after it) based on the
+   * returned `height`.
+   *
+   * This directly fixes the interior cover page (and title/copyright
+   * pages) rendering titles at a fixed font size with no regard for
+   * their actual length: short titles happened to fit, longer ones
+   * overflowed the decorative border and collided with the subtitle.
+   */
+  private static fitTitleFontSize(
+    doc: PDFKit.PDFDocument,
+    text: string,
+    maxWidth: number,
+    maxHeight: number,
+    startFontSize: number,
+    minFontSize: number,
+    font = "Helvetica-Bold",
+  ): { fontSize: number; height: number } {
+    doc.font(font);
+    let fontSize = startFontSize;
+
+    while (fontSize > minFontSize) {
+      doc.fontSize(fontSize);
+      const height = doc.heightOfString(text, {
+        width: maxWidth,
+        align: "center",
+      });
+      if (height <= maxHeight) {
+        return { fontSize, height };
+      }
+      fontSize -= 1;
+    }
+
+    // Floor reached — accept whatever height results rather than shrink
+    // indefinitely. Callers size their layout with generous headroom, so
+    // this only bites for pathologically long titles.
+    doc.fontSize(minFontSize);
+    const height = doc.heightOfString(text, {
+      width: maxWidth,
+      align: "center",
+    });
+    return { fontSize: minFontSize, height };
   }
 
   private static getDirectionVector(direction: unknown): DirectionVector {
@@ -672,6 +763,7 @@ export class PDFGenerator {
       "6x9",
       "7x10",
       "8.25x11",
+      "8.5x11",
       "A4",
       "LETTER",
       "Letter",
@@ -714,6 +806,7 @@ export class PDFGenerator {
         Subject: `${book.puzzleCount} Word Search Puzzles`,
       },
     });
+    this.registerFonts(doc);
 
     const chunks: Buffer[] = [];
     doc.on("data", (chunk: Buffer) => {
@@ -890,6 +983,31 @@ export class PDFGenerator {
     });
   }
 
+  private static registerFonts(doc: PDFKit.PDFDocument): void {
+    const fontDir = path.join(process.cwd(), "fonts");
+    const fontsToRegister: Array<[string, string]> = [
+      ["Helvetica", "LiberationSans-Regular.ttf"],
+      ["Helvetica-Bold", "LiberationSans-Bold.ttf"],
+    ];
+
+    for (const [name, filename] of fontsToRegister) {
+      const fontPath = path.join(fontDir, filename);
+      try {
+        doc.registerFont(name, fontPath);
+      } catch (err) {
+        // Falls back to PDFKit's built-in (non-embedded) standard font
+        // rather than crashing the whole export. KDP will re-flag the
+        // "fonts not embedded" warning in this case, but the book still
+        // generates — better than a hard failure on every export.
+        console.warn(
+          `[PDFGenerator] Could not load font file at ${fontPath}. ` +
+            `Falling back to built-in "${name}" (will not be embedded). ` +
+            `Error: ${(err as Error).message}`,
+        );
+      }
+    }
+  }
+
   // ==========================================================
   // COVER
   // ==========================================================
@@ -901,44 +1019,76 @@ export class PDFGenerator {
     const pageWidth = doc.page.width;
     const pageHeight = doc.page.height;
     const centerX = pageWidth / 2;
-    const centerY = pageHeight / 2;
 
     this.drawDecorativeBorder(doc, pageWidth, pageHeight);
 
+    // ── Layout is now computed top-down from real measurements instead
+    // of fixed offsets from centerY. Previously the title rendered at a
+    // hard-coded 34pt regardless of length: short titles like
+    // "adult, expert, mix" happened to fit, but anything longer ran past
+    // the decorative border and/or collided with the subtitle line,
+    // which sat at a fixed centerY - 40 no matter how tall the title
+    // actually rendered. Flowing everything downward from the icon, and
+    // sizing the title with fitTitleFontSize, fixes both. ──
+
+    const sidePadding = 70; // stay well inside drawDecorativeBorder's frame
+    const maxTitleWidth = Math.max(100, pageWidth - sidePadding * 2);
+
+    const iconY = pageHeight * 0.2;
+    this.drawPuzzleIcon(doc, centerX, iconY);
+
+    const topDividerY = iconY + 55;
     doc
-      .moveTo(centerX - 80, 120)
-      .lineTo(centerX + 80, 120)
+      .moveTo(centerX - 80, topDividerY)
+      .lineTo(centerX + 80, topDividerY)
       .strokeColor("#4a4a6a")
       .lineWidth(2)
       .stroke();
 
+    const title = this.safeText(book.title);
+
+    // Reserve a generous vertical band for the title so it can wrap to
+    // 2-3 lines and shrink gracefully instead of overflowing.
+    const maxTitleHeight = pageHeight * 0.28;
+    const titleFit = this.fitTitleFontSize(
+      doc,
+      title,
+      maxTitleWidth,
+      maxTitleHeight,
+      34,
+      15,
+      "Helvetica-Bold",
+    );
+
+    const titleY = topDividerY + 30;
+
     doc
-      .fontSize(34)
+      .fontSize(titleFit.fontSize)
       .font("Helvetica-Bold")
       .fillColor("#1a1a2e")
-      .text(this.safeText(book.title), 0, centerY - 100, {
+      .text(title, sidePadding, titleY, {
         align: "center",
-        width: pageWidth,
+        width: maxTitleWidth,
       });
+
+    const subtitleY = titleY + titleFit.height + 20;
 
     doc
       .fontSize(18)
       .font("Helvetica")
       .fillColor("#4a4a6a")
-      .text("Word Search Puzzle Book", 0, centerY - 40, {
+      .text("Word Search Puzzle Book", 0, subtitleY, {
         align: "center",
         width: pageWidth,
       });
 
-    const lineY = centerY + 10;
+    const bottomDividerY = subtitleY + 38;
     doc
-      .moveTo(centerX - 120, lineY)
-      .lineTo(centerX + 120, lineY)
+      .moveTo(centerX - 120, bottomDividerY)
+      .lineTo(centerX + 120, bottomDividerY)
       .strokeColor("#4a4a6a")
       .lineWidth(1.5)
       .stroke();
-
-    this.drawPuzzleIcon(doc, centerX, centerY - 200);
 
     // ✅ Page number is added in the main loop, not here
   }
@@ -982,7 +1132,8 @@ export class PDFGenerator {
   ): void {
     const pageWidth = doc.page.width;
     const centerX = pageWidth / 2;
-    const copyrightY = 220;
+    const sidePadding = 60;
+    const maxTitleWidth = Math.max(100, pageWidth - sidePadding * 2);
 
     doc
       .moveTo(centerX - 60, 80)
@@ -991,23 +1142,48 @@ export class PDFGenerator {
       .lineWidth(1)
       .stroke();
 
+    const title = this.safeText(book.title);
+
+    // Was a fixed 14pt with only a ~30pt gap before the subtitle line —
+    // a title that wrapped to 2 lines at 14pt (height ~34pt) would run
+    // straight into it. Now measured and the subtitle/copyright block
+    // flows below whatever height the title actually needs.
+    const titleFit = this.fitTitleFontSize(
+      doc,
+      title,
+      maxTitleWidth,
+      90,
+      14,
+      9,
+      "Helvetica-Bold",
+    );
+
+    const titleY = 120;
+
     doc
-      .fontSize(14)
+      .fontSize(titleFit.fontSize)
       .font("Helvetica-Bold")
       .fillColor("#1a1a2e")
-      .text(this.safeText(book.title), 0, 120, {
+      .text(title, sidePadding, titleY, {
         align: "center",
-        width: pageWidth,
+        width: maxTitleWidth,
       });
+
+    const subtitleY = titleY + titleFit.height + 12;
 
     doc
       .fontSize(10)
       .font("Helvetica")
       .fillColor("#666")
-      .text("Word Search Puzzle Book", 0, 150, {
+      .text("Word Search Puzzle Book", 0, subtitleY, {
         align: "center",
         width: pageWidth,
       });
+
+    // Keep the original ~220pt anchor as a floor for short (single-line)
+    // titles, so the page's overall look doesn't shift for the common
+    // case — it only moves down further when a long title needed it.
+    const copyrightY = Math.max(220, subtitleY + 40);
 
     doc
       .fontSize(10)
@@ -1193,6 +1369,49 @@ export class PDFGenerator {
    * puzzle-page and solution-page titles start (y=46 / y=50 respectively)
    * so it never collides with the in-page heading.
    */
+  // private static addRunningHeader(
+  //   doc: PDFKit.PDFDocument,
+  //   pageNumber: number,
+  //   bookTitle: string,
+  //   sectionLabel: string,
+  // ): void {
+  //   const pageWidth = doc.page.width;
+  //   const margin = doc.page.margins.left;
+  //   const rightMargin = doc.page.margins.right;
+  //   const isRightHandPage = pageNumber % 2 === 1;
+  //   const contentWidth = pageWidth - margin - rightMargin;
+
+  //   const originalTopMargin = doc.page.margins.top;
+  //   doc.page.margins.top = 0; // draw in the header zone without triggering auto-pagination
+
+  //   doc.fontSize(8).font("Helvetica").fillColor("#9a9aa8");
+
+  //   if (isRightHandPage) {
+  //     // Recto (right-hand) page: section label toward the outer edge
+  //     doc.text(sectionLabel, margin, 18, {
+  //       width: contentWidth,
+  //       align: "right",
+  //       lineBreak: false,
+  //     });
+  //   } else {
+  //     // Verso (left-hand) page: book title toward the outer edge
+  //     doc.text(bookTitle, margin, 18, {
+  //       width: contentWidth,
+  //       align: "left",
+  //       lineBreak: false,
+  //     });
+  //   }
+
+  //   doc
+  //     .moveTo(margin, 34)
+  //     .lineTo(pageWidth - rightMargin, 34)
+  //     .strokeColor("#e5e5ec")
+  //     .lineWidth(0.5)
+  //     .stroke();
+
+  //   doc.page.margins.top = originalTopMargin;
+  // }
+
   private static addRunningHeader(
     doc: PDFKit.PDFDocument,
     pageNumber: number,
@@ -1206,25 +1425,29 @@ export class PDFGenerator {
     const contentWidth = pageWidth - margin - rightMargin;
 
     const originalTopMargin = doc.page.margins.top;
-    doc.page.margins.top = 0; // draw in the header zone without triggering auto-pagination
+    doc.page.margins.top = 0;
 
-    doc.fontSize(8).font("Helvetica").fillColor("#9a9aa8");
+    // Was: drawn with lineBreak:false and no enforced max width, so a
+    // long book title could run straight past contentWidth and into (or
+    // past) the margin/gutter — this is what triggered "text outside
+    // margins" specifically on verso pages, which have a smaller
+    // contentWidth than recto pages. fitTextToWidth actually enforces
+    // the width, shrinking the font and falling back to an ellipsis.
+    const rawLabel = isRightHandPage ? sectionLabel : bookTitle;
+    const fitHeader = this.fitTextToWidth(
+      doc,
+      this.safeText(rawLabel),
+      contentWidth,
+      8,
+      6,
+    );
 
-    if (isRightHandPage) {
-      // Recto (right-hand) page: section label toward the outer edge
-      doc.text(sectionLabel, margin, 18, {
-        width: contentWidth,
-        align: "right",
-        lineBreak: false,
-      });
-    } else {
-      // Verso (left-hand) page: book title toward the outer edge
-      doc.text(bookTitle, margin, 18, {
-        width: contentWidth,
-        align: "left",
-        lineBreak: false,
-      });
-    }
+    doc.fontSize(fitHeader.fontSize).font("Helvetica").fillColor("#9a9aa8");
+    doc.text(fitHeader.text, margin, 18, {
+      width: contentWidth,
+      align: isRightHandPage ? "right" : "left",
+      lineBreak: false,
+    });
 
     doc
       .moveTo(margin, 34)
@@ -1335,7 +1558,7 @@ export class PDFGenerator {
     pageHeight: number,
     variant: "puzzle" | "solution",
   ): void {
-    const inset = 10;
+    const inset = 24;
     const frameColor = "#e2e2ec";
     const iconColor = "#c7c7dc";
     const iconSize = 11;
@@ -2068,20 +2291,16 @@ export class PDFGenerator {
   }
 
   /**
-   * Lays out a solution's word list in 3 columns, numbered DOWN each
-   * column before moving to the next — word 1 at the top of column 1,
-   * continuing downward, only wrapping into column 2 once column 1 is
-   * full. Matches how a printed multi-column reference list is normally
-   * read, rather than left-to-right across each row.
-   *
-   * Column widths are NOT fixed/equal: each column is sized to its own
-   * longest label at the chosen font size, so a column of short words
-   * doesn't waste space a neighboring column of long words actually
-   * needs. Font size steps down from 6.5pt to a 4.5pt floor until the 3
-   * columns (at their natural widths) fit side by side in boxWidth;
-   * per-item fitTextToWidth in the caller (using each item's maxWidth)
-   * is still the final safety net for any single word too long for its
-   * column even at the floor size.
+   * Sizes each column to its own widest word at the chosen font size, then
+   * splits whatever whitespace is left over EVENLY across all 3 columns —
+   * instead of anchoring column 1/3 to the box edges and only letting the
+   * middle column absorb slack. That anchor approach could push column 3
+   * left of where column 1 actually ended whenever the natural widths
+   * already summed close to (or over) boxWidth, causing the overlap seen
+   * on puzzles with long compound words. Even distribution keeps every
+   * column's start position strictly increasing and never overlapping,
+   * because the padding added to column 1 always shifts column 2's start
+   * point further right by the same amount, and so on down the line.
    */
   private static layoutSolutionWordList(
     doc: PDFKit.PDFDocument,
@@ -2100,13 +2319,10 @@ export class PDFGenerator {
     const MAX_FONT = 6.5;
     const MIN_FONT = 4.5;
     const FONT_STEP = 0.3;
-    const SEARCH_ARROW_SIZE = 6; // near-constant across this font range; fine to fix during the fit test
+    const SEARCH_ARROW_SIZE = 6;
     const COLUMN_GAP = itemGap;
 
     const itemsPerColumn = Math.ceil(words.length / COLUMNS) || 1;
-
-    // Column-major grouping: column 0 gets words 1..itemsPerColumn,
-    // column 1 the next chunk, column 2 the remainder.
     const columnGroups: number[][] = [];
     for (let c = 0; c < COLUMNS; c++) {
       const start = c * itemsPerColumn;
@@ -2118,53 +2334,74 @@ export class PDFGenerator {
       }
     }
 
+    const naturalWidthsAt = (fontSize: number): number[] => {
+      doc.fontSize(fontSize).font("Helvetica");
+      return columnGroups.map((colIndices) => {
+        let w = 0;
+        for (const idx of colIndices) {
+          const label = `${idx + 1}. ${this.safeText(words[idx])}`;
+          w = Math.max(
+            w,
+            SEARCH_ARROW_SIZE + arrowGap + doc.widthOfString(label),
+          );
+        }
+        return w;
+      });
+    };
+
+    // Pick the largest font size where the columns' own natural widths
+    // (before any padding) already fit within boxWidth — same search as
+    // before, just re-measuring per column rather than assuming a fixed
+    // 3-column packing order.
     let chosenFontSize = MIN_FONT;
+    let naturalWidths = naturalWidthsAt(MIN_FONT);
 
     for (
       let fontSize = MAX_FONT;
       fontSize >= MIN_FONT - 0.001;
       fontSize -= FONT_STEP
     ) {
-      doc.fontSize(fontSize).font("Helvetica");
-
-      let totalWidth = -COLUMN_GAP;
-      for (const colIndices of columnGroups) {
-        let colWidth = 0;
-        for (const idx of colIndices) {
-          const label = `${idx + 1}. ${this.safeText(words[idx])}`;
-          colWidth = Math.max(
-            colWidth,
-            SEARCH_ARROW_SIZE + arrowGap + doc.widthOfString(label),
-          );
-        }
-        totalWidth += colWidth + COLUMN_GAP;
-      }
-
+      const widths = naturalWidthsAt(fontSize);
+      const total =
+        widths.reduce((a, b) => a + b, 0) + COLUMN_GAP * (widths.length - 1);
       chosenFontSize = fontSize;
-      if (totalWidth <= boxWidth) {
-        break;
-      }
+      naturalWidths = widths;
+      if (total <= boxWidth) break;
     }
 
     const rowH = Math.max(7, chosenFontSize + 3);
     const arrowSize = Math.max(5.8, Math.min(6, rowH - 1));
 
-    doc.fontSize(chosenFontSize).font("Helvetica");
+    // Leftover whitespace = boxWidth minus what the columns actually need
+    // at their natural widths. Split it evenly across every column instead
+    // of letting only one column claim it.
+    //
+    // If this comes out negative (natural widths already exceed boxWidth
+    // even at MIN_FONT — only happens with extremely long words), each
+    // column gets an equal small haircut below its own natural width. That
+    // alone would risk overlap, but the per-item fitTextToWidth call in
+    // drawSolutionMiniGrid (unchanged, still runs after this) re-measures
+    // each word against its assigned column width and shrinks/truncates
+    // it individually — so no two words can ever collide, even here.
+    const naturalTotal =
+      naturalWidths.reduce((a, b) => a + b, 0) +
+      COLUMN_GAP * (naturalWidths.length - 1);
+    const leftoverSpace = boxWidth - naturalTotal;
+    const extraPerColumn = leftoverSpace / naturalWidths.length;
 
-    // Each column's actual width at the chosen font size, so columns
-    // are laid out at their natural widths rather than equal thirds.
-    const columnWidths = columnGroups.map((colIndices) => {
-      let w = 0;
-      for (const idx of colIndices) {
-        const label = `${idx + 1}. ${this.safeText(words[idx])}`;
-        w = Math.max(w, arrowSize + arrowGap + doc.widthOfString(label));
-      }
-      return w;
-    });
+    const columnWidths = naturalWidths.map((w) =>
+      Math.max(10, w + extraPerColumn),
+    );
+
+    const columnX: number[] = [];
+    let cursorX = 0;
+    for (const w of columnWidths) {
+      columnX.push(cursorX);
+      cursorX += w + COLUMN_GAP;
+    }
 
     const items: WordFlowItem[] = [];
     let colorIndex = 0;
-    let colX = 0;
 
     columnGroups.forEach((colIndices, colPos) => {
       colIndices.forEach((idx, rowPos) => {
@@ -2180,13 +2417,12 @@ export class PDFGenerator {
           word,
           label,
           info: wordMap.get(word),
-          x: colX,
+          x: columnX[colPos],
           row: rowPos,
           color,
           maxWidth: columnWidths[colPos] - arrowSize - arrowGap,
         });
       });
-      colX += columnWidths[colPos] + COLUMN_GAP;
     });
 
     return {
@@ -2253,7 +2489,7 @@ export class PDFGenerator {
     // ── Word-list sizing: prefer a clean 3-per-row grid, shrinking font
     // size first before ever letting a row drop below 3 items ──
     const arrowGap = 2;
-    const itemGap = 8;
+    const itemGap = 4;
 
     const layout = this.layoutSolutionWordList(
       doc,

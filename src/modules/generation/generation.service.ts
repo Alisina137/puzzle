@@ -181,24 +181,65 @@ export class GenerationService {
           book.puzzleCount,
         );
       }
+      // domainAssignments / mixedDomainAssignments are pre-sized to
+      // book.puzzleCount. Once retries push us past that length (because
+      // earlier slots failed and we opened replacement slots), fall back to
+      // a random domain instead of reading past the array end.
+      const getDomainForSlot = (slotIndex: number): string => {
+        if (settings.wordSelectionMode !== "single-domain") return "";
+        if (slotIndex < domainAssignments.length) {
+          return (
+            domainAssignments[slotIndex] ||
+            themeDomainInfo.domains[0]?.name ||
+            ""
+          );
+        }
+        const names = themeDomainInfo.domains.map((d) => d.name);
+        return names[Math.floor(Math.random() * names.length)] || "";
+      };
+
+      const getDomainsForSlot = (slotIndex: number): string[] => {
+        if (settings.wordSelectionMode !== "mixed-domain") return [];
+        if (slotIndex < mixedDomainAssignments.length) {
+          return mixedDomainAssignments[slotIndex] || [];
+        }
+        const names = themeDomainInfo.domains.map((d) => d.name);
+        const shuffled = [...names].sort(() => Math.random() - 0.5);
+        return shuffled.slice(0, Math.min(3, shuffled.length));
+      };
 
       const allFingerprints: any[] = [];
       const targetDifficulty = book.difficultyLevel || "Medium";
       const usedWords: string[] = [];
 
-      for (let puzzleIndex = 0; puzzleIndex < book.puzzleCount; puzzleIndex++) {
+      // Was: `for (puzzleIndex = 0; puzzleIndex < book.puzzleCount; puzzleIndex++)`
+      // — exactly `puzzleCount` slots were attempted, and a slot that
+      // exhausted all 15 regeneration attempts was simply marked failed and
+      // skipped, permanently leaving the book short (this is the root cause
+      // of "requested 100, got 95"). Now we keep opening new slots until we
+      // actually HAVE puzzleCount successes, capped at maxTotalSlots so a
+      // genuinely impossible request (vocabulary too small) still terminates.
+      let slotIndex = 0;
+      const maxTotalSlots = book.puzzleCount * 3;
+
+      while (
+        result.generatedPuzzles < book.puzzleCount &&
+        slotIndex < maxTotalSlots
+      ) {
         let puzzleGenerated = false;
         let attempts = 0;
         const maxRegenerationAttempts = 15;
 
         console.log(
-          `[Generation] Starting puzzle ${puzzleIndex + 1}/${book.puzzleCount}`,
+          `[Generation] Starting slot ${slotIndex + 1} ` +
+            `(have ${result.generatedPuzzles}/${book.puzzleCount} so far)`,
         );
 
         while (!puzzleGenerated && attempts < maxRegenerationAttempts) {
           attempts++;
+          result.totalAttempts++;
           console.log(
-            `[Generation] Puzzle ${puzzleIndex + 1}, attempt ${attempts}/${maxRegenerationAttempts}`,
+            `[Generation] Slot ${slotIndex + 1}, attempt ${attempts}/${maxRegenerationAttempts}`,
           );
 
           try {
@@ -208,17 +249,10 @@ export class GenerationService {
             let puzzleDomains: string[] = [];
 
             if (useDomains) {
-              // Domain-based word selection
-              const domainForPuzzle =
-                settings.wordSelectionMode === "single-domain"
-                  ? domainAssignments[puzzleIndex] ||
-                    themeDomainInfo.domains[0]?.name ||
-                    ""
-                  : "";
-
+              const domainForPuzzle = getDomainForSlot(slotIndex);
               const domainsForPuzzle =
                 settings.wordSelectionMode === "mixed-domain"
-                  ? mixedDomainAssignments[puzzleIndex] || []
+                  ? getDomainsForSlot(slotIndex)
                   : [domainForPuzzle];
 
               const selectionResult = DomainWordSelectionService.selectWords({
@@ -232,33 +266,30 @@ export class GenerationService {
                 minWordLength: settings.minWordLength,
                 maxWordLength: settings.maxWordLength,
                 gridSize: settings.gridSize,
-                puzzleIndex,
+                puzzleIndex: slotIndex,
               });
 
               if (selectionResult.shortage) {
                 console.warn(
-                  `[Generation] Word shortage for puzzle ${puzzleIndex + 1}: need ${selectionResult.shortageAmount} more words. ` +
-                    `Difficulty restriction (${targetDifficulty}) maintained — no fallback to other pools.`,
+                  `[Generation] Word shortage for slot ${slotIndex + 1}: need ${selectionResult.shortageAmount} more words.`,
                 );
                 result.warnings.push(
-                  `Puzzle ${puzzleIndex + 1}: word shortage of ${selectionResult.shortageAmount} (difficulty: ${targetDifficulty})`,
+                  `Slot ${slotIndex + 1}: word shortage of ${selectionResult.shortageAmount} (difficulty: ${targetDifficulty})`,
                 );
               }
 
               if (selectionResult.words.length < settings.minWordsPerPuzzle) {
                 throw new Error(
-                  `Not enough eligible words for puzzle ${puzzleIndex + 1} ` +
+                  `Not enough eligible words for slot ${slotIndex + 1} ` +
                     `(domain: ${domainForPuzzle || domainsForPuzzle.join(", ")}, ` +
                     `available: ${selectionResult.words.length}, ` +
-                    `minimum: ${settings.minWordsPerPuzzle}). ` +
-                    `Difficulty restriction (${targetDifficulty}) prevents using other pools.`,
+                    `minimum: ${settings.minWordsPerPuzzle}).`,
                 );
               }
 
               puzzleDomain = selectionResult.domain;
               puzzleDomains = selectionResult.domains;
 
-              // Try placing the selected words
               for (
                 let wc = selectionResult.words.length;
                 wc >= settings.minWordsPerPuzzle;
@@ -289,32 +320,29 @@ export class GenerationService {
                   );
                   break;
                 }
-
                 console.log(`[Generation] ❌ Failed with ${wc} words`);
               }
             } else {
-              // Legacy word selection (backward compatibility)
               const availableWords = eligibleWords.filter(
                 (word) => !usedWords.includes(word),
               );
-
-              let wordCount = settings.targetWordsPerPuzzle;
-
-              for (let wc = wordCount; wc >= settings.minWordsPerPuzzle; wc--) {
+              for (
+                let wc = settings.targetWordsPerPuzzle;
+                wc >= settings.minWordsPerPuzzle;
+                wc--
+              ) {
                 const candidateWords =
                   WordSelectionService.selectCandidateWords(
                     availableWords,
                     wc,
                     settings.gridSize,
                   );
-
                 if (candidateWords.length < wc) {
                   console.warn(
                     `[Generation] Not enough candidate words for ${wc}`,
                   );
                   continue;
                 }
-
                 const genResult = await this.generatePuzzleWithWords(
                   candidateWords,
                   settings,
@@ -322,29 +350,29 @@ export class GenerationService {
                   allFingerprints,
                   bookId,
                 );
-
                 if (genResult.success) {
                   puzzleWords = candidateWords;
                   placementSuccess = true;
                   console.log(`[Generation] ✅ Success with ${wc} words`);
                   break;
                 }
-
                 console.log(`[Generation] ❌ Failed with ${wc} words`);
               }
             }
 
             if (!placementSuccess) {
               console.warn(
-                `[Generation] Could not place words after trying from ${settings.targetWordsPerPuzzle} down to ${settings.minWordsPerPuzzle}`,
+                `[Generation] Could not place words from ${settings.targetWordsPerPuzzle} down to ${settings.minWordsPerPuzzle}`,
               );
               if (attempts < maxRegenerationAttempts) {
                 result.regeneratedPuzzles++;
                 continue;
               }
+              // This slot is spent — the outer while loop will open a fresh
+              // one instead of accepting the book being short.
               result.failedPuzzles++;
               result.errors.push(
-                `Puzzle ${puzzleIndex + 1} failed to place words after ${maxRegenerationAttempts} attempts`,
+                `Slot ${slotIndex + 1} failed to place words after ${maxRegenerationAttempts} attempts`,
               );
               break;
             }
@@ -354,25 +382,36 @@ export class GenerationService {
             puzzleGenerated = true;
 
             console.log(
-              `[Generation] Puzzle ${puzzleIndex + 1} generated successfully after ${attempts} attempt(s) with ${puzzleWords.length} words`,
+              `[Generation] Slot ${slotIndex + 1} succeeded after ${attempts} attempt(s) with ${puzzleWords.length} words. ` +
+                `Total: ${result.generatedPuzzles}/${book.puzzleCount}`,
             );
           } catch (error: any) {
             console.error(
-              `[Generation] Puzzle ${puzzleIndex + 1} attempt ${attempts} failed:`,
+              `[Generation] Slot ${slotIndex + 1} attempt ${attempts} failed:`,
               error,
             );
-
             if (attempts >= maxRegenerationAttempts) {
               result.errors.push(
-                `Puzzle ${puzzleIndex + 1} generation failed after ${maxRegenerationAttempts} attempts: ${error.message}`,
+                `Slot ${slotIndex + 1} generation failed after ${maxRegenerationAttempts} attempts: ${error.message}`,
               );
               result.failedPuzzles++;
             } else {
               result.regeneratedPuzzles++;
-              console.log(`[Generation] Retrying puzzle ${puzzleIndex + 1}...`);
+              console.log(`[Generation] Retrying slot ${slotIndex + 1}...`);
             }
           }
         }
+
+        slotIndex++;
+      }
+
+      if (result.generatedPuzzles < book.puzzleCount) {
+        const shortfall = book.puzzleCount - result.generatedPuzzles;
+        result.errors.push(
+          `Could not reach the target of ${book.puzzleCount} puzzles after ${slotIndex} slot attempts ` +
+            `(capped at ${maxTotalSlots}). Short by ${shortfall} — the theme/domain vocabulary is ` +
+            `likely too small for this word length, grid size and difficulty combination.`,
+        );
       }
 
       let status = "ready";
@@ -390,6 +429,9 @@ export class GenerationService {
         data: {
           status,
           qualityScore,
+          ...(result.generatedPuzzles < result.totalPuzzles
+            ? { puzzleCount: result.generatedPuzzles }
+            : {}),
         },
       });
 
@@ -440,6 +482,211 @@ export class GenerationService {
 
       return result;
     }
+  }
+
+  /**
+   * Every word already used across a book's existing puzzles, so a
+   * newly added puzzle doesn't repeat them. generateBook() keeps this
+   * in memory during bulk generation; a standalone "add one more
+   * puzzle" call happens long after that list is gone, so it has to be
+   * rebuilt from what's actually persisted.
+   */
+  static async getUsedWordsForBook(bookId: string): Promise<string[]> {
+    const bookPuzzles = await prisma.bookPuzzle.findMany({
+      where: { bookId },
+      include: { puzzle: true },
+    });
+
+    const usedWords: string[] = [];
+    for (const bp of bookPuzzles) {
+      const data = bp.puzzle?.data as any;
+      const words = Array.isArray(data?.words) ? data.words : [];
+      usedWords.push(...words.map((w: string) => String(w).toUpperCase()));
+    }
+    return usedWords;
+  }
+
+  /**
+   * Generates and saves ONE additional puzzle for an existing book,
+   * using the same domain-aware, difficulty-restricted word selection
+   * as bulk generation. This is what POST /api/books/[bookId]/puzzles
+   * should call — it previously reimplemented its own word selection
+   * using the legacy flat word list, which ignored domains, ignored the
+   * book's difficulty pool restriction, and never excluded words
+   * already used elsewhere in the book.
+   *
+   * Simplification versus bulk generation: domain choice here is random
+   * per call rather than continuing the exact shuffled-cycle-with-
+   * carryover sequence from the original bulk run (that cycle's state
+   * was never persisted anywhere to resume from). Word-level exclusion
+   * via usedWords still fully applies, so this won't repeat words —
+   * it just doesn't guarantee perfect domain-rotation fairness against
+   * puzzles added this way.
+   */
+  static async generateAdditionalPuzzle(
+    bookId: string,
+  ): Promise<{ success: boolean; bookPuzzle?: any; error?: string }> {
+    const book = await prisma.book.findUnique({ where: { id: bookId } });
+    if (!book) {
+      return { success: false, error: "Book not found" };
+    }
+
+    const settings = this.getGenerationSettings(book);
+    const themeDomainInfo = loadThemeDomains(book.theme);
+    const useDomains =
+      themeDomainInfo.hasVocabulary && themeDomainInfo.domainCount > 0;
+    const targetDifficulty = book.difficultyLevel || "Medium";
+    const usedWords = await this.getUsedWordsForBook(bookId);
+    const allFingerprints: any[] = [];
+
+    let puzzleWords: string[] = [];
+    let placementSuccess = false;
+    let lastError = "";
+
+    const maxRegenerationAttempts = 15;
+    for (
+      let attempt = 1;
+      attempt <= maxRegenerationAttempts && !placementSuccess;
+      attempt++
+    ) {
+      if (useDomains) {
+        const domainNames = themeDomainInfo.domains.map((d) => d.name);
+        const shuffled = [...domainNames].sort(() => Math.random() - 0.5);
+
+        const domainForPuzzle =
+          settings.wordSelectionMode === "single-domain"
+            ? shuffled[0] || ""
+            : "";
+        const domainsForPuzzle =
+          settings.wordSelectionMode === "mixed-domain"
+            ? shuffled.slice(0, Math.min(3, shuffled.length))
+            : [domainForPuzzle];
+
+        const selectionResult = DomainWordSelectionService.selectWords({
+          theme: book.theme,
+          domain: domainForPuzzle,
+          domains: domainsForPuzzle,
+          mode: settings.wordSelectionMode,
+          wordsPerPuzzle: settings.targetWordsPerPuzzle,
+          bookDifficulty: targetDifficulty,
+          usedWords,
+          minWordLength: settings.minWordLength,
+          maxWordLength: settings.maxWordLength,
+          gridSize: settings.gridSize,
+          puzzleIndex: 0,
+        });
+
+        if (selectionResult.words.length < settings.minWordsPerPuzzle) {
+          lastError =
+            `Not enough eligible words (domain: ${domainForPuzzle || domainsForPuzzle.join(", ")}, ` +
+            `available: ${selectionResult.words.length}, minimum: ${settings.minWordsPerPuzzle}). ` +
+            `Difficulty restriction (${targetDifficulty}) prevents using other pools.`;
+          continue;
+        }
+
+        const puzzleDomain = selectionResult.domain;
+        const puzzleDomains = selectionResult.domains;
+
+        for (
+          let wc = selectionResult.words.length;
+          wc >= settings.minWordsPerPuzzle;
+          wc--
+        ) {
+          const candidateWords = selectionResult.words.slice(0, wc);
+          const genResult = await this.generatePuzzleWithWords(
+            candidateWords,
+            settings,
+            targetDifficulty,
+            allFingerprints,
+            bookId,
+            puzzleDomain
+              ? {
+                  theme: book.theme,
+                  domain: puzzleDomain,
+                  domains: puzzleDomains,
+                }
+              : undefined,
+          );
+          if (genResult.success) {
+            puzzleWords = candidateWords;
+            placementSuccess = true;
+            break;
+          }
+        }
+      } else {
+        const allThemeWords = WordSelectionService.getThemeWordsByLevel(
+          book.theme,
+          settings.vocabularyLevels,
+        );
+        const normalized = [
+          ...new Set(
+            allThemeWords.map((w) => w.trim().toUpperCase()).filter(Boolean),
+          ),
+        ];
+        const eligibleWords = normalized.filter((word) => {
+          const validLength =
+            word.length >= settings.minWordLength &&
+            word.length <= settings.maxWordLength;
+          return (
+            validLength &&
+            word.length <= settings.gridSize &&
+            !usedWords.includes(word)
+          );
+        });
+
+        if (eligibleWords.length < settings.minWordsPerPuzzle) {
+          lastError = `Not enough eligible words for theme "${book.theme}".`;
+          continue;
+        }
+
+        for (
+          let wc = settings.targetWordsPerPuzzle;
+          wc >= settings.minWordsPerPuzzle;
+          wc--
+        ) {
+          const candidateWords = WordSelectionService.selectCandidateWords(
+            eligibleWords,
+            wc,
+            settings.gridSize,
+          );
+          if (candidateWords.length < wc) continue;
+
+          const genResult = await this.generatePuzzleWithWords(
+            candidateWords,
+            settings,
+            targetDifficulty,
+            allFingerprints,
+            bookId,
+          );
+          if (genResult.success) {
+            puzzleWords = candidateWords;
+            placementSuccess = true;
+            break;
+          }
+        }
+      }
+    }
+
+    if (!placementSuccess) {
+      return {
+        success: false,
+        error:
+          lastError ||
+          "Could not generate a puzzle with the available words. Please try again.",
+      };
+    }
+
+    const bookPuzzle = await prisma.bookPuzzle.findFirst({
+      where: { bookId },
+      orderBy: { position: "desc" },
+    });
+
+    await prisma.book.update({
+      where: { id: bookId },
+      data: { puzzleCount: { increment: 1 } },
+    });
+
+    return { success: true, bookPuzzle };
   }
 
   /**

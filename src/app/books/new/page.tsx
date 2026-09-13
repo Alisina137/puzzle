@@ -9,6 +9,7 @@ import { Loader2, PlusCircle, BookOpen } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import { SuggestTitleButton } from "@/components/book/SuggestTitleButton";
 
 const createBookSchema = z.object({
   title: z
@@ -24,7 +25,9 @@ const createBookSchema = z.object({
   targetAudience: z.string().min(1, "Please select a target audience"),
   difficultyLevel: z.string().min(1, "Please select a difficulty level"),
   trimSize: z.string().min(1, "Please select a trim size"),
-  wordSelectionMode: z.enum(["single-domain", "mixed-domain"]).default("single-domain"),
+  wordSelectionMode: z
+    .enum(["single-domain", "mixed-domain"])
+    .default("single-domain"),
 });
 
 type CreateBookFormData = z.infer<typeof createBookSchema>;
@@ -151,7 +154,9 @@ export default function CreateBookPage() {
     }
     async function loadDomains() {
       try {
-        const response = await fetch(`/api/themes/${encodeURIComponent(selectedTheme)}/domains`);
+        const response = await fetch(
+          `/api/themes/${encodeURIComponent(selectedTheme)}/domains`,
+        );
         if (response.ok) {
           const data = await response.json();
           setDomainInfo({
@@ -238,9 +243,23 @@ export default function CreateBookPage() {
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             {/* Book Title */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Book Title <span className="text-red-500">*</span>
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-sm font-medium text-gray-700">
+                  Book Title <span className="text-red-500">*</span>
+                </label>
+                <SuggestTitleButton
+                  theme={
+                    themes.find((t) => t.id === selectedTheme)?.label ||
+                    selectedTheme
+                  }
+                  difficultyLevel={watch("difficultyLevel")}
+                  targetAudience={watch("targetAudience")}
+                  puzzleCount={puzzleCount}
+                  onSelectTitle={(title) =>
+                    setValue("title", title, { shouldValidate: true })
+                  }
+                />
+              </div>
               <input
                 type="text"
                 {...register("title")}
@@ -248,6 +267,7 @@ export default function CreateBookPage() {
                 placeholder="Enter your book title..."
                 disabled={isSubmitting}
               />
+
               {errors.title && (
                 <p className="text-red-500 text-sm mt-1">
                   {errors.title.message}
@@ -417,7 +437,8 @@ export default function CreateBookPage() {
               )}
               {domainInfo && !domainInfo.hasVocabulary && selectedTheme && (
                 <p className="text-amber-600 text-xs mt-1">
-                  No domain vocabulary generated yet for this theme. Words will be selected from the default word list.
+                  No domain vocabulary generated yet for this theme. Words will
+                  be selected from the default word list.
                 </p>
               )}
             </div>
